@@ -55,7 +55,7 @@ pip install shachen
 import shachen
 
 result = shachen.run_debra(scene, skin_temperature=merra_ts, emissivity=camel)
-result["cf_comb"]        # combined dust confidence, 0–1
+result["cf_comb"]  # combined dust confidence, 0–1
 ```
 
 The [User guide](guide.md) covers what `scene` must contain, the two

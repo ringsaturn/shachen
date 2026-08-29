@@ -6,7 +6,7 @@ of **DEBRA-Dust**, the Dynamic Enhancement with Background Reduction Algorithm
 for GOES ABI and Himawari AHI.
 
 *shachen* (沙尘) is Chinese for "sand and dust". The package is a home for
-infrared-channel dust algorithms; DEBRA-Dust is the first one.
+infrared-channel dust algorithms.
 
 This appears to be the first public implementation of DEBRA.
 
@@ -47,6 +47,22 @@ Only one background scheme is used at a time: `run_debra` requires exactly one
 of `emissivity=` or `background=`. The composite scheme carries the
 split-window water-vapour depression that the semi-analytic one lacks.
 
+The second algorithm is the baseline the first is judged against:
+`pipeline.run_dust_rgb` is the classic **Dust RGB** ([Lensky and Rosenfeld
+2008](https://doi.org/10.5194/acp-8-6739-2008); [GOES-R Quick
+Guide](https://rammb.cira.colostate.edu/training/visit/quick_guides/Dust_RGB_Quick_Guide.pdf))
+— three fixed infrared stretches, no background, no cloud mask. It needs no
+ancillary data, reads one band DEBRA does not (11.2 µm), and returns the same
+`(y, x, gun)` layout, so both render through the same path.
+`scripts/run_case.py` writes it beside every DEBRA image for comparison.
+
+Its stretches are picked **per sensor** from the scene's reader — the scheme
+has no single canonical set of numbers, having been re-tuned for each imager
+after SEVIRI — so the baseline is that satellite's operational product rather
+than a recipe borrowed from another one. The
+[Dust RGB page](https://ringsaturn.github.io/shachen/api/dustrgb.html) has the
+table and the references.
+
 ## Documentation
 
 **<https://ringsaturn.github.io/shachen/>** — user guide, all 29 equations as
@@ -83,7 +99,10 @@ pip install "shachen[all]"         # everything, for the reproduction scripts
 import shachen
 
 result = shachen.run_debra(scene, emissivity=camel, skin_temperature=merra_ts)
-result["cf_comb"]        # combined dust confidence, 0–1
+result["cf_comb"]  # combined dust confidence, 0–1
+
+baseline = shachen.run_dust_rgb(scene)  # the classic Dust RGB, for comparison
+baseline["dust_rgb"]  # (y, x, gun) floats in 0–1
 ```
 
 What `scene` must contain, the two background schemes, and the imagery chain

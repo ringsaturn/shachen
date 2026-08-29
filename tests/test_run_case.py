@@ -25,7 +25,7 @@ _ABI = _DATA / "2017-03-23-swus" / "abi"
 _MERRA = _DATA / "merra2" / "merra2_ts_20170323.nc"
 _EMIS = _DATA / "emissivity" / "CAM5K30EM_201703.nc"
 _HAVE_CASE = (
-    _ABI.exists() and len(list(_ABI.glob("*.nc"))) >= 7 and _MERRA.exists() and _EMIS.exists()
+    _ABI.exists() and len(list(_ABI.glob("*.nc"))) >= 8 and _MERRA.exists() and _EMIS.exists()
 )
 
 
@@ -111,6 +111,10 @@ def test_save_outputs_synthetic(tmp_path, latlon_area):
                 ("y", "x", "gun"),
                 rng.uniform(0.0, 1.0, (ny, nx, 3)),
             ),
+            "dust_rgb": (
+                ("y", "x", "gun"),
+                rng.uniform(0.0, 1.0, (ny, nx, 3)),
+            ),
         },
         coords={"gun": ["r", "g", "b"]},
         attrs={
@@ -122,6 +126,8 @@ def test_save_outputs_synthetic(tmp_path, latlon_area):
     assert nc_path.exists() and nc_path.suffix == ".nc"
     assert png_path.exists() and png_path.suffix == ".png"
     assert png_path.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    dust_png = tmp_path / "demo_dustrgb.png"
+    assert dust_png.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
     reopened = xr.open_dataset(nc_path)
     assert "cf_comb" in reopened and "rgb" in reopened
     assert isinstance(reopened.attrs["start_time"], str)
@@ -143,8 +149,9 @@ def test_cli_end_to_end_yellow_plume(tmp_path):
 
     ncs = list(tmp_path.glob("*.nc"))
     pngs = list(tmp_path.glob("*.png"))
-    assert len(ncs) == 1 and len(pngs) == 1
-    assert pngs[0].stat().st_size > 0
+    # The DEBRA composite plus the classic Dust RGB baseline PNG.
+    assert len(ncs) == 1 and len(pngs) == 2
+    assert all(png.stat().st_size > 0 for png in pngs)
 
     out = xr.open_dataset(ncs[0])
     assert "cf_comb" in out and "rgb" in out
@@ -186,7 +193,7 @@ def _composite_day_count() -> int:
 
 _HAVE_COMPOSITE_CASE = (
     _ABI13.exists()
-    and len(list(_ABI13.glob("*.nc"))) >= 7
+    and len(list(_ABI13.glob("*.nc"))) >= 8
     and _MERRA13.exists()
     and _EMIS13.exists()
     and _composite_day_count() >= 5

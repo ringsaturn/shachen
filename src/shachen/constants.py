@@ -1,12 +1,15 @@
-"""All DEBRA tuning constants in one place.
+"""All frozen numbers in one place: DEBRA's tuning constants and the
+classic Dust RGB recipe.
 
 Every (MIN, MAX) scaling bound, offset, and weight from Miller et al. (2017),
 JGR Atmospheres, doi:10.1002/2017JD027365, using the 26 Feb 2020 erratum
 versions of Eqs. 7, 21, 22, 24, 25. The paper notes "minor retuning" may be
 needed per sensor; retune here, nowhere else.
 
-Sign/orientation conventions follow the printed equations exactly (see the
-plan's §3.3 for the ambiguities to validate against case imagery).
+Sign/orientation conventions follow the printed equations exactly.
+
+The sensor facts here (:class:`Band` and the channel maps) are not from the
+paper; they are what each instrument calls the roles the algorithms read.
 """
 
 from dataclasses import dataclass, field
@@ -22,7 +25,11 @@ class Bounds:
 
 
 class Band(StrEnum):
-    """Spectral roles used by DEBRA (nominal wavelengths in micrometres)."""
+    """Spectral roles the algorithms read (nominal wavelengths in um).
+
+    Seven of these are DEBRA's inputs (:data:`DEBRA_BANDS`);
+    ``TIR_112`` exists only for the classic Dust RGB green gun.
+    """
 
     VIS_064 = "vis_064"  #: cloud mask + day baseline image
     NIR_160 = "nir_160"  #: daytime cloud test (reserved)
@@ -30,10 +37,11 @@ class Band(StrEnum):
     WV_62 = "wv_62"  #: deep-convection test CM2
     TIR_86 = "tir_86"  #: dust test DT2 (8.4-8.6 um)
     TIR_104 = "tir_104"  #: clean window reference (10.3-10.4 um)
+    TIR_112 = "tir_112"  #: classic Dust RGB green gun only (11.2 um; not a DEBRA input)
     TIR_123 = "tir_123"  #: dirty window, RSW / DT1 (12.3 um)
 
 
-#: DEBRA role -> GOES-R ABI channel name (satpy dataset names).
+#: Spectral role -> GOES-R ABI channel name (satpy dataset names).
 ABI_BANDS: dict[Band, str] = {
     Band.VIS_064: "C02",
     Band.NIR_160: "C05",
@@ -41,10 +49,11 @@ ABI_BANDS: dict[Band, str] = {
     Band.WV_62: "C08",
     Band.TIR_86: "C11",
     Band.TIR_104: "C13",
+    Band.TIR_112: "C14",
     Band.TIR_123: "C15",
 }
 
-#: DEBRA role -> Himawari AHI band name (satpy dataset names).
+#: Spectral role -> Himawari AHI band name (satpy dataset names).
 AHI_BANDS: dict[Band, str] = {
     Band.VIS_064: "B03",
     Band.NIR_160: "B05",
@@ -52,8 +61,14 @@ AHI_BANDS: dict[Band, str] = {
     Band.WV_62: "B08",
     Band.TIR_86: "B11",
     Band.TIR_104: "B13",
+    Band.TIR_112: "B14",
     Band.TIR_123: "B15",
 }
+
+#: The seven DEBRA algorithm input roles (Miller et al. 2017 Table 1).
+#: ``Band.TIR_112`` exists only for the classic Dust RGB comparison baseline
+#: (:mod:`shachen.dustrgb`); pipelines that feed DEBRA alone load these.
+DEBRA_BANDS: tuple[Band, ...] = tuple(band for band in Band if band is not Band.TIR_112)
 
 #: Nominal central wavelengths (um) used to interpolate the UWBF emissivity
 #: hinge points to sensor band centers (ABI values; AHI within tolerance).
@@ -64,6 +79,7 @@ BAND_CENTER_UM: dict[Band, float] = {
     Band.WV_62: 6.19,
     Band.TIR_86: 8.44,
     Band.TIR_104: 10.33,
+    Band.TIR_112: 11.19,
     Band.TIR_123: 12.30,
 }
 
@@ -152,6 +168,58 @@ COLOR_DIMMING: dict[str, tuple[float, float, float]] = {
 #: composite days accepted at load time before the background is refused.
 COMPOSITE_WINDOW_DAYS: int = 14
 COMPOSITE_MIN_DAYS: int = 5
+
+
+@dataclass(frozen=True)
+class DustRGBConstants:
+    """One classic Dust RGB stretch set. Not part of DEBRA (Eqs. 1-29).
+
+    Each gun is ``N(x; MIN, MAX) ** (1/gamma)`` over the GOES-R/Himawari band
+    mix of the CIRA Dust RGB Quick Guide (satpy's ``dust`` composite):
+    12.3-10.3, 11.2-8.4, 10.3 — note the green minuend is 11.2 um, not the
+    10.8 um of SEVIRI's ``IR10.8 - IR8.7``.
+
+    The stretch values are **per sensor**: :data:`DUST_RGB` (SEVIRI) and
+    :data:`DUST_RGB_ABI` are the two published sets, dispatched by
+    :data:`DUST_RGB_BY_READER`. See :mod:`shachen.dustrgb` for the references.
+    """
+
+    #: RED: BT12.3 - BT10.4 (split window), [-4, +2] K, gamma 1.
+    red: Bounds = field(default_factory=lambda: Bounds(-4.0, 2.0))
+    #: GRN: BT11.2 - BT8.6, [0, 15] K, gamma 2.5 (note: 11.2 um, not 10.4).
+    green: Bounds = field(default_factory=lambda: Bounds(0.0, 15.0))
+    green_gamma: float = 2.5
+    #: BLU: BT10.4, [261, 289] K, gamma 1.
+    blue: Bounds = field(default_factory=lambda: Bounds(261.0, 289.0))
+
+
+#: The original SEVIRI stretches (Lensky and Rosenfeld 2008, as formalised in
+#: EUMeTrain's recipe compilation; satpy's generic ``dust_default``
+#: enhancement). Applied to Himawari here, which is what satpy does too — it
+#: ships no ``dust_ahi`` override. Also the fallback for an unknown sensor.
+DUST_RGB = DustRGBConstants()
+
+#: The ABI-adjusted stretches from the CIRA GOES-R Dust RGB Quick Guide (satpy's
+#: sensor-specific ``dust_abi`` enhancement), converted from the Quick Guide's
+#: degrees Celsius. Berndt et al. (2018) is the method behind the adjustment:
+#: ABI's channels do not sit where SEVIRI's do, so the SEVIRI numbers put the
+#: clear-sky land background at the wrong end of the red stretch.
+DUST_RGB_ABI = DustRGBConstants(
+    red=Bounds(-6.7, 2.6),
+    green=Bounds(-0.5, 20.0),
+    blue=Bounds(261.2, 288.7),
+)
+
+#: satpy reader -> the stretch set that sensor's operational product uses.
+#: :func:`shachen.pipeline.run_dust_rgb` reads this off ``scene.attrs["reader"]``
+#: so a baseline rendered here matches what forecasters actually look at. The
+#: same rule is why there is no single "classic" recipe to freeze: the scheme is
+#: retuned per imager (satpy carries ``ash_abi``, ``convection_abi`` and the
+#: night-microphysics variants for the same reason).
+DUST_RGB_BY_READER: dict[str, DustRGBConstants] = {
+    "abi_l1b": DUST_RGB_ABI,
+    "ahi_hsd": DUST_RGB,
+}
 
 
 @dataclass(frozen=True)

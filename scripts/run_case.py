@@ -196,6 +196,10 @@ def run_case(
     loaded with ``SENSOR_READERS[inputs.sensor]`` and cropped to
     ``inputs.bbox`` when set.
 
+    :func:`shachen.pipeline.run_dust_rgb` runs over the same scene and its
+    ``dust_rgb`` variable is merged in, so every case also carries the
+    classic baseline to compare the enhancement against.
+
     ``inputs.background`` selects the background source: ``semianalytic``
     loads CAMEL emissivity as before; ``composite`` loads each of
     ``inputs.composite_dirs`` TIR-only (``load_scene`` with
@@ -206,7 +210,7 @@ def run_case(
     from shachen.imagery import debra_imagery
     from shachen.io.merra import load_skin_temperature
     from shachen.io.satellite import load_scene
-    from shachen.pipeline import run_debra
+    from shachen.pipeline import run_debra, run_dust_rgb
 
     dimming = COLOR_DIMMING[color]  # unknown color -> KeyError
 
@@ -229,7 +233,7 @@ def run_case(
         debra_out = run_debra(scene, skin_temperature, emissivity, constants)
     imagery = debra_imagery(scene, debra_out, constants, dimming)
 
-    result = xr.merge([debra_out, imagery], combine_attrs="drop")
+    result = xr.merge([debra_out, imagery, run_dust_rgb(scene)], combine_attrs="drop")
     result.attrs.update(scene.attrs)
     return result
 
@@ -246,7 +250,11 @@ def save_outputs(
     for serialization (``area`` replaced by its string description,
     ``start_time`` by its ISO string); the PNG is rendered via
     :func:`shachen.render.render_debra_png` from ``result["rgb"]`` converted
-    with :func:`shachen.imagery.to_uint8`. Returns ``(nc_path, png_path)``.
+    with :func:`shachen.imagery.to_uint8`. When ``result`` carries
+    ``dust_rgb`` (the classic baseline from
+    :func:`shachen.pipeline.run_dust_rgb`), a second PNG
+    ``<stem>_dustrgb.png`` is rendered next to it for side-by-side
+    comparison. Returns ``(nc_path, png_path)``.
     """
     from shachen.imagery import to_uint8
     from shachen.render import render_debra_png
@@ -272,6 +280,15 @@ def save_outputs(
         png_path,
         dpi=dpi,
     )
+    if "dust_rgb" in result:
+        render_debra_png(
+            to_uint8(result["dust_rgb"]),
+            result.attrs["area"],
+            result.attrs["start_time"],
+            out_dir / f"{stem}_dustrgb.png",
+            title=f"Dust RGB — {result.attrs['start_time']:%Y-%m-%d %H:%M} UTC",
+            dpi=dpi,
+        )
     return nc_path, png_path
 
 
@@ -330,6 +347,7 @@ def main(argv: list[str] | None = None) -> None:
 
     print(f"netCDF -> {nc_path}")
     print(f"PNG    -> {png_path}")
+    print(f"PNG    -> {png_path.with_name(f'{stem}_dustrgb.png')} (classic Dust RGB baseline)")
 
 
 if __name__ == "__main__":

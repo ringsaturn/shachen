@@ -19,10 +19,11 @@ from shachen.constants import COMPOSITE_WINDOW_DAYS
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
-ABI_CHANNELS = ("C02", "C05", "C07", "C08", "C11", "C13", "C15")
+#: The 7 DEBRA roles + C14/B14 (11.2 um, classic Dust RGB green gun only),
+#: constants.ABI_BANDS/AHI_BANDS order.
+ABI_CHANNELS = ("C02", "C05", "C07", "C08", "C11", "C13", "C14", "C15")
 
-#: Himawari AHI band names of the 7 DEBRA roles (constants.AHI_BANDS order).
-AHI_CHANNELS = ("B03", "B05", "B07", "B08", "B11", "B13", "B15")
+AHI_CHANNELS = ("B03", "B05", "B07", "B08", "B11", "B13", "B14", "B15")
 
 #: ABI channel names of shachen.composite.COMPOSITE_BANDS (8.4/10.3/12.3 um) -
 #: the only bands a composite background day needs.
@@ -79,7 +80,7 @@ def _scan_start(key: str) -> dt.datetime:
 
 
 def fetch_abi(case: Case, out_dir: Path) -> list[Path]:
-    """Download the 7 DEBRA bands for the scan nearest case.when."""
+    """Download the ``ABI_CHANNELS`` bands for the scan nearest case.when."""
     import s3fs
 
     fs = s3fs.S3FileSystem(anon=True)
@@ -162,11 +163,12 @@ def ahi_local_name(key: str) -> str:
     return name
 
 
-def fetch_ahi(case: Case, out_dir: Path) -> list[Path]:
-    """Download the 7 DEBRA bands (2-km R20 files) of ``case``'s timeline.
+def fetch_ahi(case: Case, out_dir: Path, channels: tuple[str, ...] = AHI_CHANNELS) -> list[Path]:
+    """Download ``channels`` (2-km R20 files) of ``case``'s timeline.
 
     Lists :func:`ahi_timeline_prefix` (missing/empty prefix -> RuntimeError
-    naming it), selects via :func:`select_ahi_keys`, downloads files not
+    naming it), selects ``channels`` via :func:`select_ahi_keys` (a caller that
+    only feeds DEBRA can pin the 7 bands here), downloads files not
     already in ``out_dir``, and returns the local paths in selection order.
     Each key lands under :func:`ahi_local_name` — B03 is decompressed on
     arrival (stdlib bz2, the compressed download removed) and the
@@ -187,7 +189,7 @@ def fetch_ahi(case: Case, out_dir: Path) -> list[Path]:
 
     out_dir.mkdir(parents=True, exist_ok=True)
     local: list[Path] = []
-    for key in select_ahi_keys(keys):
+    for key in select_ahi_keys(keys, channels):
         chan = Path(key).name.split("_")[4]
         dest = out_dir / ahi_local_name(key)
         if not dest.exists():

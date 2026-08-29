@@ -71,7 +71,7 @@ def test_abi_cases_keep_defaults():
 
 
 def test_ahi_channels_match_band_roles():
-    assert fetch_case.AHI_CHANNELS == ("B03", "B05", "B07", "B08", "B11", "B13", "B15")
+    assert fetch_case.AHI_CHANNELS == ("B03", "B05", "B07", "B08", "B11", "B13", "B14", "B15")
     assert fetch_case.AHI_CHANNELS == tuple(AHI_BANDS[band] for band in Band)
 
 
@@ -125,6 +125,7 @@ def test_select_ahi_keys_picks_r20_per_channel():
         "HS_H08_20160421_0800_B08_FLDK_R20_S0101.DAT.bz2",
         "HS_H08_20160421_0800_B11_FLDK_R20_S0101.DAT.bz2",
         "HS_H08_20160421_0800_B13_FLDK_R20_S0101.DAT.bz2",
+        "HS_H08_20160421_0800_B14_FLDK_R20_S0101.DAT.bz2",
         "HS_H08_20160421_0800_B15_FLDK_R20_S0101.DAT.bz2",
         "HS_H08_20160421_0800_B16_FLDK_R20_S0101.DAT.bz2",
     )
@@ -273,7 +274,7 @@ _AHI_DIR = _DATA / _CASE / "ahi"
 _MERRA16 = _DATA / "merra2" / "merra2_ts_20160421.nc"
 _EMIS16 = _DATA / "emissivity" / "CAM5K30EM_201604.nc"
 
-_HAVE_SCENE = _AHI_DIR.exists() and len(list(_AHI_DIR.glob("*.DAT*"))) >= 7
+_HAVE_SCENE = _AHI_DIR.exists() and len(list(_AHI_DIR.glob("*.DAT*"))) >= 8
 _HAVE_CASE = _HAVE_SCENE and _MERRA16.exists() and _EMIS16.exists()
 
 
@@ -328,8 +329,10 @@ def test_mongolia_end_to_end(tmp_path):
     run_case.main([_CASE, "--outdir", str(tmp_path), "--tuning", "paper"])
     ncs = list(tmp_path.glob("*.nc"))
     pngs = list(tmp_path.glob("*.png"))
-    assert len(ncs) == 1 and len(pngs) == 1
-    assert pngs[0].read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    # The DEBRA composite plus the classic Dust RGB baseline PNG.
+    assert len(ncs) == 1 and len(pngs) == 2
+    for png in pngs:
+        assert png.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
 
     out = xr.open_dataset(ncs[0])
     assert "cf_comb" in out and "rgb" in out

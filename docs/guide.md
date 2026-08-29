@@ -63,10 +63,10 @@ import shachen
 
 result = shachen.run_debra(scene, skin_temperature=merra_ts, emissivity=camel)
 
-result["cf_comb"]      # combined dust confidence, 0–1 (Eq. 22)
-result["dt1"]          # split-window test against the dynamic background
+result["cf_comb"]  # combined dust confidence, 0–1 (Eq. 22)
+result["dt1"]  # split-window test against the dynamic background
 result["cm_norm_day"]  # normalised daytime cloud mask
-result["zenith_deg"]   # per-pixel solar zenith
+result["zenith_deg"]  # per-pixel solar zenith
 ```
 
 `skin_temperature` is MERRA-2 `TS` (K) **on its native lat/lon grid** — the
@@ -96,7 +96,7 @@ on the scene grid:
 ```python
 from shachen.composite import composite_background
 
-bg = composite_background([day_1, day_2, ...])   # same grid, same hour
+bg = composite_background([day_1, day_2, ...])  # same grid, same hour
 result = shachen.run_debra(scene, skin_temperature=merra_ts, background=bg)
 ```
 
@@ -136,7 +136,7 @@ blended greyscale baseline, then a per-gun colour modulation by `cf_comb`.
 from shachen.imagery import debra_imagery, to_uint8
 from shachen.render import render_debra_png
 
-imagery = debra_imagery(scene, result)          # vis_bg, ir_bg, b_bg, bi, rgb
+imagery = debra_imagery(scene, result)  # vis_bg, ir_bg, b_bg, bi, rgb
 render_debra_png(
     to_uint8(imagery["rgb"]),
     scene.attrs["area"],

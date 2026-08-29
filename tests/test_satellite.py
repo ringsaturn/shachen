@@ -11,8 +11,8 @@ import pytest
 CASE_DIR = Path(__file__).resolve().parents[1] / "data" / "2017-03-23-swus" / "abi"
 
 pytestmark = pytest.mark.skipif(
-    len(list(CASE_DIR.glob("*.nc"))) < 7 if CASE_DIR.exists() else True,
-    reason="2017-03-23 case not downloaded (run scripts/fetch_case.py)",
+    len(list(CASE_DIR.glob("*.nc"))) < 8 if CASE_DIR.exists() else True,
+    reason="2017-03-23 case not downloaded or missing C14 (re-run scripts/fetch_case.py)",
 )
 
 
@@ -23,10 +23,11 @@ def scene():
     return load_scene(sorted(CASE_DIR.glob("*.nc")))
 
 
-def test_all_seven_bands_on_common_grid(scene):
+def test_all_bands_on_common_grid(scene):
     assert sorted(scene.data_vars) == [
         "bt_swir_39",
         "bt_tir_104",
+        "bt_tir_112",
         "bt_tir_123",
         "bt_tir_86",
         "bt_wv_62",

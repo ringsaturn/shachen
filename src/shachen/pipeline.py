@@ -1,8 +1,14 @@
-"""End-to-end DEBRA pipeline: scene + ancillary -> confidence factor fields.
+"""End-to-end entry points: one call per algorithm, scene in, fields out.
 
-Eqs. 1-22: regrid ancillary onto the scene grid, derive solar zenith and land
-mask, then chain background -> cloud mask -> dust tests -> confidence.
-Enhanced imagery (Eqs. 23-29) lives in :mod:`shachen.imagery`.
+:func:`run_debra` is DEBRA, Eqs. 1-22: regrid ancillary onto the scene grid,
+derive solar zenith and land mask, then chain background -> cloud mask ->
+dust tests -> confidence. Enhanced imagery (Eqs. 23-29) lives in
+:mod:`shachen.imagery`.
+
+:func:`run_dust_rgb` is the classic Dust RGB baseline, which needs no
+ancillary data at all but does need to know which sensor it is looking at.
+Callers reach both through this module rather than the per-equation modules,
+so adding an algorithm does not change how one is run.
 """
 
 import xarray as xr
@@ -11,9 +17,16 @@ from shachen import background as _background
 from shachen import cloudmask as _cloudmask
 from shachen import confidence as _confidence
 from shachen import dust_tests as _dust_tests
+from shachen import dustrgb as _dustrgb
 from shachen import geo as _geo
 from shachen import solar as _solar
-from shachen.constants import DEFAULTS, DebraConstants
+from shachen.constants import (
+    DEFAULTS,
+    DUST_RGB,
+    DUST_RGB_BY_READER,
+    DebraConstants,
+    DustRGBConstants,
+)
 
 #: Variables a precomputed ``background`` Dataset must carry (the
 #: :func:`shachen.background.background_signals` contract).
@@ -131,5 +144,37 @@ def run_debra(
     out["is_land"] = is_land
     if "n_valid" in bg:
         out["n_valid"] = bg["n_valid"]
+    out.attrs.update(scene.attrs)
+    return out
+
+
+def run_dust_rgb(scene: xr.Dataset, constants: DustRGBConstants | None = None) -> xr.Dataset:
+    """Run the classic Dust RGB baseline on one scene.
+
+    The counterpart of :func:`run_debra` for the recipe in
+    :mod:`shachen.dustrgb`: same scene in, but no ancillary data, no cloud mask
+    and no confidence field — three fixed stretches of ``bt_tir_86/104/112/123``
+    (11.2 um is the extra band DEBRA itself never reads). A scene loaded with
+    ``roles=DEBRA_BANDS`` therefore raises ValueError here.
+
+    **The stretches are per sensor.** Unlike DEBRA, the Dust RGB has no one
+    canonical set of numbers: it was tuned for SEVIRI and then re-tuned for each
+    later imager, because the corresponding channels do not sit at the same
+    wavelengths. With ``constants=None`` (the default) the set is chosen from
+    ``scene.attrs["reader"]`` through :data:`shachen.constants.DUST_RGB_BY_READER`
+    — ABI gets the Quick Guide's adjusted values, AHI the original SEVIRI ones —
+    so the baseline matches that sensor's operational product rather than a
+    recipe borrowed from another satellite. An unknown or absent reader falls
+    back to :data:`shachen.constants.DUST_RGB` (SEVIRI); pass ``constants``
+    explicitly to pin one set across sensors, e.g. to compare the two.
+
+    Returns a Dataset carrying ``dust_rgb`` — dims ``(y, x, gun)``, floats in
+    [0, 1], ready for :func:`shachen.imagery.to_uint8` — with the scene's
+    ``area`` and ``start_time`` attrs preserved, so it merges straight into a
+    :func:`run_debra` result for side-by-side rendering.
+    """
+    if constants is None:
+        constants = DUST_RGB_BY_READER.get(scene.attrs.get("reader"), DUST_RGB)
+    out = xr.Dataset({"dust_rgb": _dustrgb.dust_rgb(scene, constants)})
     out.attrs.update(scene.attrs)
     return out

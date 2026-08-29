@@ -1,8 +1,10 @@
 # API reference
 
-Every module maps onto a numbered block of equations from Miller et al. (2017).
-Read down the table to follow the algorithm in the order it runs; the
-[Equations](../equations.md) page writes those equations out in full.
+Every DEBRA module maps onto a numbered block of equations from Miller et al.
+(2017). Read down the table to follow the algorithm in the order it runs; the
+[Equations](../equations.md) page writes those equations out in full. The one
+entry marked "—" under Equations is the classic Dust RGB baseline, which is
+not part of the paper.
 
 | Equations | Module | What it does |
 |---|---|---|
@@ -15,9 +17,10 @@ Read down the table to follow the algorithm in the order it runs; the
 | Eqs. 1–12 | [`shachen.cloudmask`](cloudmask.md) | cloud confidence with dust restoral |
 | Eqs. 13–15 | [`shachen.dust_tests`](dust_tests.md) | DT1–DT3 against the dynamic background |
 | Eqs. 16–22 | [`shachen.confidence`](confidence.md) | day/terminator/night blend → `cf_comb` |
-| Eqs. 1–22 | [`shachen.pipeline`](pipeline.md) | the whole chain, end to end |
+| Eqs. 1–22 | [`shachen.pipeline`](pipeline.md) | the entry point per algorithm |
 | Eqs. 23–29 | [`shachen.imagery`](imagery.md) | baseline image and CF-modulated RGB |
 | §4.2 | [`shachen.render`](render.md) | georeferenced PNG with map overlays |
+| — | [`shachen.dustrgb`](dustrgb.md) | classic Dust RGB comparison baseline |
 | all | [`shachen.constants`](constants.md) | every bound, offset and weight |
 
 ## Top-level namespace
@@ -41,6 +44,7 @@ dust_tests
 confidence
 imagery
 render
+dustrgb
 geo
 solar
 norm

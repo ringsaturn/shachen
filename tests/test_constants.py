@@ -13,7 +13,11 @@ from shachen.constants import (
     AHI_BANDS,
     BAND_CENTER_UM,
     COLOR_DIMMING,
+    DEBRA_BANDS,
     DEFAULTS,
+    DUST_RGB,
+    DUST_RGB_ABI,
+    DUST_RGB_BY_READER,
     Band,
 )
 
@@ -144,6 +148,7 @@ class TestBandMappings:
             (Band.WV_62, "C08", "B08"),
             (Band.TIR_86, "C11", "B11"),
             (Band.TIR_104, "C13", "B13"),
+            (Band.TIR_112, "C14", "B14"),
             (Band.TIR_123, "C15", "B15"),
         ],
     )
@@ -151,7 +156,7 @@ class TestBandMappings:
         assert ABI_BANDS[band] == abi
         assert AHI_BANDS[band] == ahi
 
-    def test_all_seven_roles_mapped(self):
+    def test_all_roles_mapped(self):
         assert set(ABI_BANDS) == set(Band)
         assert set(AHI_BANDS) == set(Band)
         assert set(BAND_CENTER_UM) == set(Band)
@@ -159,3 +164,35 @@ class TestBandMappings:
     def test_band_centers_ordered(self):
         centers = [BAND_CENTER_UM[b] for b in Band]
         assert centers == sorted(centers)
+
+    def test_debra_bands_exclude_only_the_dust_rgb_extra(self):
+        assert DEBRA_BANDS == tuple(b for b in Band if b is not Band.TIR_112)
+        assert len(DEBRA_BANDS) == 7
+
+
+class TestDustRGBRecipe:
+    def test_seviri_set_matches_the_eumetrain_recipe(self):
+        # EUMeTrain "Compilation of RGB Recipes", Dust RGB: IR12.0-IR10.8
+        # [-4, +2] K gamma 1, IR10.8-IR8.7 [0, +15] K gamma 2.5, IR10.8
+        # [261, 289] K gamma 1. Also satpy's generic dust_default.
+        assert (DUST_RGB.red.min, DUST_RGB.red.max) == (-4.0, 2.0)
+        assert (DUST_RGB.green.min, DUST_RGB.green.max) == (0.0, 15.0)
+        assert DUST_RGB.green_gamma == 2.5
+        assert (DUST_RGB.blue.min, DUST_RGB.blue.max) == (261.0, 289.0)
+
+    def test_abi_set_matches_the_cira_quick_guide(self):
+        # GOES-R Quick Guide: Dust RGB, recipe table, converted from degrees
+        # Celsius (-11.95 C = 261.2 K, 15.55 C = 288.7 K). Also satpy dust_abi.
+        assert (DUST_RGB_ABI.red.min, DUST_RGB_ABI.red.max) == (-6.7, 2.6)
+        assert (DUST_RGB_ABI.green.min, DUST_RGB_ABI.green.max) == (-0.5, 20.0)
+        assert DUST_RGB_ABI.green_gamma == 2.5
+        assert (DUST_RGB_ABI.blue.min, DUST_RGB_ABI.blue.max) == (261.2, 288.7)
+
+    def test_dispatch_covers_every_supported_reader(self):
+        # Same readers io.satellite.load_scene accepts: a sensor we can load but
+        # cannot pick a recipe for would silently render the wrong baseline.
+        from shachen.io.satellite import _READERS
+
+        assert set(DUST_RGB_BY_READER) == set(_READERS)
+        assert DUST_RGB_BY_READER["abi_l1b"] is DUST_RGB_ABI
+        assert DUST_RGB_BY_READER["ahi_hsd"] is DUST_RGB

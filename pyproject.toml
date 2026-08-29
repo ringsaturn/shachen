@@ -52,6 +52,7 @@ dependencies = [
 Homepage = "https://github.com/ringsaturn/shachen"
 Repository = "https://github.com/ringsaturn/shachen"
 Issues = "https://github.com/ringsaturn/shachen/issues"
+Documentation = "https://ringsaturn.github.io/shachen/"
 Paper = "https://doi.org/10.1002/2017JD027365"
 
 # Splitting these out is safe because the heavy dependencies are imported

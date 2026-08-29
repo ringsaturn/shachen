@@ -96,4 +96,4 @@ If you use this software, please cite the original algorithm:
 and, for the implementation, the metadata in `CITATION.cff`.
 
 This is an independent implementation. It is not produced, endorsed, or
-verified by the paper's authors, by CIRA, or by NOAA.
+verified by the papers' authors, by EUMETSAT, by CIRA, or by NOAA.

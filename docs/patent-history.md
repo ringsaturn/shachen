@@ -1,8 +1,8 @@
 # Patent history
 
 An early formulation of the DEBRA algorithm was patented. The patent
-expired in 2024; this page records the public record.  Development of this
-implementation began on 2026-08-25, more than two years after the patent lapsed.
+expired in 2024; this page records the public record. Development of this
+implementation began in August 2026, more than two years after the patent lapsed.
 
 ```{admonition} Not legal advice
 :class: important
@@ -28,7 +28,9 @@ legal advice.
 The USPTO legal-event record: the 4th-year maintenance fee was paid
 (2019-12-18), the 8th-year reminder was mailed 2024-02-26, no payment
 followed, the lapse was recorded 2024-08-12 with effect from 2024-07-05.
-As of the verification date there is no petition to reinstate on record.
+No petition to reinstate appears in the Google Patents legal-event record as
+of the verification date. Whether one is pending in the USPTO's own
+transaction history has not been checked; Patent Center requires a login.
 
 ## No patent ever existed outside the United States
 
@@ -37,20 +39,28 @@ The patent's only family member (DOCDB family 51223030) is PCT application
 (PCT/US2014/011586), which **ceased without entering the national phase in
 any country**. There has never been a corresponding patent in Japan, China,
 Europe, or anywhere else. There are also no continuations, divisionals, or
-continuations-in-part: application 14/150,467 is the family's only US
-member.
+continuations-in-part *within this family*: application 14/150,467 is the
+only US member of DOCDB family 51223030.
+
+```{note}
+That statement is scoped to the family. A later application by the same
+inventors — an ABI adaptation, or an ash or fog variant — would not appear
+in family 51223030 and is **not** covered here. Establishing that would take
+an inventor-name search of the USPTO full-text database, which has not been
+done.
+```
 
 Two predecessor patents by the same inventor and assignee — US 7,242,803
 and US 7,379,592, the SeaWiFS-era "significant dust detection and
 enhancement" algorithms (priority 2003) — expired at the end of their
 20-year terms.
 
-## The patent describes the 2014 tuning, not the 2017 paper
+## Constants in the patent differ from the published algorithm
 
-The claims transcribe the algorithm's equations with specific constants.
-Those constants predate the published paper and differ from what this
-package (which follows Miller et al. 2017, as amended by the 2020 erratum)
-implements:
+The patent recites specific constants for the algorithm's tests. They
+predate the published paper and differ from what this package (which follows
+Miller et al. 2017, as amended by the 2020 erratum) implements. Recorded
+here as provenance for anyone cross-checking where a number came from:
 
 | Quantity | Patent claims (2014) | Miller et al. 2017 / this package |
 |---|---|---|
@@ -59,10 +69,7 @@ implements:
 | 8.5 µm test (BTD2 / DT2) upper bound | 0.5 K | 3.0 K |
 | Confidence normalization | 0.5 – 2.5 | 0.25 – 2.50 |
 | Terminator weighting | threshold on cos θ > 0.383 | zenith-band blending, exponent 1.5 |
-| RGB composition (cap 0.5, blue 0.1, gun max 1.2) | identical | identical |
-
-The patent therefore documents an earlier tuning of the same algorithm;
-only the RGB recipe matches the constants in `shachen.constants`.
+| RGB composition: CF cap / blue dimming / gun max | 0.5 / 0.1 / 1.2 | 0.5 / 0.1 / 1.2 |
 
 ## Verifying the current status
 
@@ -74,5 +81,9 @@ only the RGB recipe matches the constants in `shachen.constants`.
   [USPTO fee storefront](https://fees.uspto.gov/MaintenanceFees/)
 - Ceased PCT family member:
   [WIPO PatentScope, WO 2014/116472](https://patentscope.wipo.int/search/en/detail.jsf?docId=WO2014116472)
+- Later applications by the same inventors (not covered above; the name is a
+  common one, so filter by assignee and subject matter):
+  [USPTO Patent Public Search](https://ppubs.uspto.gov/pubwebapp/), inventor
+  name search
 - Assignment records:
   [USPTO Assignment Search](https://assignmentcenter.uspto.gov/search/patent/abstract%3FapplicationNumber%3D14150467)

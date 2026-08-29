@@ -12,8 +12,13 @@ algorithm described in:
 
   Equations follow the erratum published 26 February 2020.
 
-The paper is not distributed with this software. This implementation is not
-produced, endorsed, or verified by the paper's authors, by CIRA, or by NOAA.
+This product also includes an implementation of the classic Dust RGB composite,
+a published recipe formalized by EUMETSAT/EUMeTrain and adapted for GOES-R ABI
+by the NOAA/NASA GOES-R program (CIRA/RAMMB, NASA SPoRT). Its source
+publications are listed in CITATION.cff.
+
+No source publication is distributed with this software. This implementation is
+not produced, endorsed, or verified by any author or organization named above.
 
 Patent history for the DEBRA algorithm is documented in
 docs/patent-history.md.

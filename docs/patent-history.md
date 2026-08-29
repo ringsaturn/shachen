@@ -1,8 +1,8 @@
 # Patent history
 
 An early formulation of the DEBRA algorithm was patented. The patent
-expired in 2024; this page records the public record. All commits in this
-repository postdate the expiration.
+expired in 2024; this page records the public record.  Development of this
+implementation began on 2026-08-25, more than two years after the patent lapsed.
 
 ```{admonition} Not legal advice
 :class: important

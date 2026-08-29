@@ -1,6 +1,6 @@
 [project]
 name = "shachen"
-version = "0.2.0"
+version = "0.2.1"
 description = "Infrared satellite dust storm detection — an open implementation of the DEBRA-Dust algorithm for GOES ABI and Himawari AHI"
 readme = "README.md"
 license = "Apache-2.0"

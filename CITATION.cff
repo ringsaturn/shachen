@@ -1,13 +1,18 @@
 cff-version: 1.2.0
 message: >-
-  If you use this software, please cite both this implementation and the
-  original algorithm paper listed under `references`.
+  Please cite this software, plus the references for the algorithm you actually
+  ran -- DEBRA-Dust and the Dust RGB are separate published schemes. For
+  `run_debra`, cite Miller et al. (2017). For `run_dust_rgb`, cite Lensky and
+  Rosenfeld (2008) together with the recipe applied to your sensor: the GOES-R
+  Quick Guide for ABI, the EUMeTrain compilation for AHI. Each reference below
+  states its scope.
 title: "shachen: infrared satellite dust storm detection"
 abstract: >-
   An open Python implementation of DEBRA-Dust, the Dynamic Enhancement with
   Background Reduction Algorithm for satellite-based dust storm detection,
   supporting GOES ABI and Himawari AHI. Equations follow the 26 February 2020
-  erratum.
+  erratum. The classic Dust RGB composite is included as the comparison
+  baseline, with per-sensor stretch recipes.
 type: software
 authors:
   - family-names: Xiao
@@ -22,11 +27,15 @@ keywords:
   - infrared
   - split window
   - DEBRA
+  - Dust RGB
+  - RGB composite
   - GOES ABI
   - Himawari AHI
 references:
   - type: article
-    scope: "The algorithm implemented by this software."
+    scope: >-
+      The algorithm implemented by `run_debra`. Cite this if you used DEBRA-Dust
+      output.
     title: >-
       A dynamic enhancement with background reduction algorithm: Overview and
       application to satellite-based dust storm detection
@@ -52,3 +61,68 @@ references:
     notes: >-
       This implementation follows the erratum published 26 February 2020, not
       the equations as originally printed.
+  - type: article
+    scope: >-
+      The origin of the Dust RGB scheme. Cite this if you used `run_dust_rgb`
+      output, on any sensor.
+    title: "Clouds-Aerosols-Precipitation Satellite Analysis Tool (CAPSAT)"
+    authors:
+      - family-names: Lensky
+        given-names: Itamar M.
+      - family-names: Rosenfeld
+        given-names: Daniel
+    journal: "Atmospheric Chemistry and Physics"
+    year: 2008
+    volume: 8
+    start: 6739
+    end: 6753
+    doi: 10.5194/acp-8-6739-2008
+  - type: report
+    scope: >-
+      The band mix used by `run_dust_rgb` on every sensor, and the stretch values
+      it applies to GOES ABI scenes. Cite this alongside Lensky and Rosenfeld
+      (2008) for Dust RGB output from ABI.
+    title: "Quick Guide: Dust RGB"
+    authors:
+      - family-names: Fuell
+        given-names: Kevin
+        affiliation: "NASA Short-term Prediction Research and Transition Center"
+    institution:
+      name: >-
+        Cooperative Institute for Research in the Atmosphere / Regional and
+        Mesoscale Meteorology Branch
+    url: "https://rammb.cira.colostate.edu/training/visit/quick_guides/Dust_RGB_Quick_Guide.pdf"
+    notes: >-
+      Listed on the guide as its contributor. No publication date is printed on
+      the document.
+  - type: generic
+    scope: >-
+      The SEVIRI Dust RGB recipe, which `run_dust_rgb` applies to Himawari AHI
+      scenes. Cite this alongside Lensky and Rosenfeld (2008) for Dust RGB output
+      from AHI.
+    title: "Compilation of RGB Recipes"
+    authors:
+      - name: "EUMeTrain"
+    url: "https://eumetrain.org/sites/default/files/2020-05/RGB_recipes.pdf"
+  - type: article
+    scope: >-
+      Why the Dust RGB stretch values differ between ABI and AHI. Cite this if
+      that per-sensor distinction matters to your result.
+    title: >-
+      A methodology to determine recipe adjustments for multispectral composites
+      derived from next-generation advanced satellite imagers
+    authors:
+      - family-names: Berndt
+        given-names: Emily
+      - family-names: Elmer
+        given-names: Nicholas
+      - family-names: Schultz
+        given-names: Lori
+      - family-names: Molthan
+        given-names: Andrew
+    journal: "Journal of Atmospheric and Oceanic Technology"
+    year: 2018
+    volume: 35
+    start: 643
+    end: 664
+    doi: 10.1175/JTECH-D-17-0047.1

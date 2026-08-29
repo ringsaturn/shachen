@@ -138,7 +138,18 @@ weight from the paper, unit-tested against an independent transcription.
 
 ## Citation
 
-If you use this software, please cite the original algorithm:
+Cite the software itself from `CITATION.cff` (GitHub's "Cite this repository"
+button renders it). Which *scientific* references to add depends on **which
+algorithm you ran** — DEBRA and the Dust RGB are separate published schemes that
+share nothing but their input bands:
+
+| What you used | Cite |
+|---|---|
+| `run_debra` — DEBRA-Dust | Miller et al. (2017) |
+| `run_dust_rgb` — Dust RGB baseline | Lensky and Rosenfeld (2008), plus the recipe for your sensor |
+| both, e.g. a side-by-side comparison | all of the above |
+
+**DEBRA-Dust** — the algorithm this package exists to implement:
 
 > Miller, S. D., Bankert, R. L., Grasso, L. D., Lindsey, D. T., Kuciauskas,
 > A. P., & Combs, C. L. (2017). A dynamic enhancement with background reduction
@@ -146,10 +157,31 @@ If you use this software, please cite the original algorithm:
 > *Journal of Geophysical Research: Atmospheres*, 122, 12,938–12,959.
 > https://doi.org/10.1002/2017JD027365
 
-and, for the implementation, the metadata in `CITATION.cff`.
+**Dust RGB** — the comparison baseline, origin of the scheme:
+
+> Lensky, I. M., & Rosenfeld, D. (2008). Clouds-Aerosols-Precipitation Satellite
+> Analysis Tool (CAPSAT). *Atmospheric Chemistry and Physics*, 8, 6739–6753.
+> https://doi.org/10.5194/acp-8-6739-2008
+
+...and the recipe actually applied, which differs by sensor — **ABI** scenes use
+the GOES-R Quick Guide's adjusted stretches, **AHI** scenes the original SEVIRI
+ones:
+
+> Fuell, K. (contributor). *Quick Guide: Dust RGB*. NOAA/NASA GOES-R,
+> CIRA/RAMMB.
+> https://rammb.cira.colostate.edu/training/visit/quick_guides/Dust_RGB_Quick_Guide.pdf
+
+> EUMeTrain. *Compilation of RGB Recipes*.
+> https://eumetrain.org/sites/default/files/2020-05/RGB_recipes.pdf
+
+[Berndt et al. (2018)](https://doi.org/10.1175/JTECH-D-17-0047.1) is why those
+two differ, and is worth citing if the per-sensor distinction matters to your
+result. All of these are in `CITATION.cff` with their scopes; the
+[Dust RGB page](https://ringsaturn.github.io/shachen/api/dustrgb.html) shows
+which values go with which sensor.
 
 This is an independent implementation. It is not produced, endorsed, or
-verified by the paper's authors, by CIRA, or by NOAA.
+verified by the papers' authors, by EUMETSAT, by CIRA, or by NOAA.
 
 ## License
 

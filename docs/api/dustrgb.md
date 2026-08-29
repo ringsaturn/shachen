@@ -1,14 +1,19 @@
 # Classic Dust RGB
 
-The naive Dust RGB, the baseline DEBRA is judged against. Not part of Miller et
-al. (2017): three fixed infrared stretches, no background reduction, no cloud
-mask, no confidence field. [`shachen.pipeline.run_dust_rgb`](pipeline.md) is the
-entry point.
+The standard operational infrared dust composite: three fixed band-difference
+stretches that make lofted mineral dust read pink to magenta over dark
+blue-green surfaces, day and night. Forecasters have used it on SEVIRI, ABI and
+AHI for years; it needs no ancillary data and no cloud mask, which is both why
+it is cheap to run and why it has no notion of how dusty a pixel is.
+[`shachen.pipeline.run_dust_rgb`](pipeline.md) is the entry point.
+
+In this package it also serves as the comparison baseline for DEBRA-Dust — the
+image to put next to an enhancement to see what the enhancement bought.
 
 ## The stretches are per sensor
 
-Unlike DEBRA, the Dust RGB has **no single canonical set of numbers**. It was
-tuned for Meteosat SEVIRI and then re-tuned for each later imager, because the
+The Dust RGB has **no single canonical set of numbers**. It was tuned for
+Meteosat SEVIRI and then re-tuned for each later imager, because the
 corresponding channels do not sit at the same wavelengths — most visibly in the
 green gun, where SEVIRI's `IR10.8 − IR8.7` becomes `11.2 − 8.4` on ABI. Berndt
 et al. (2018) is the method behind those adjustments, and the same reasoning
@@ -33,6 +38,15 @@ which is what you want when comparing the two, not when producing a baseline.
 
 The bands themselves never change: `DEBRA_BANDS` plus 11.2 µm, the one channel
 DEBRA never reads.
+
+## Citing this baseline
+
+This is a published scheme in its own right, cited independently of anything
+else in this package. If a figure or a number in your work comes from
+`run_dust_rgb`, cite Lensky and Rosenfeld (2008) plus the recipe for the sensor
+you ran it on — the Quick Guide for ABI, the EUMeTrain compilation for AHI. The
+repository's `CITATION.cff` records each reference with that scope, and the
+README maps every algorithm in the package to what it needs cited.
 
 ## References
 

@@ -1,7 +1,9 @@
-"""Classic Dust RGB — the naive baseline DEBRA is judged against.
+"""Classic Dust RGB — the standard operational infrared dust composite.
 
-Not part of the DEBRA algorithm (Eqs. 1-29): no background reduction, no cloud
-mask, no confidence field, just three fixed stretches of the infrared channels.
+Three fixed stretches of the infrared channels, no ancillary data and no cloud
+mask, which is why it is cheap and why it says only "dust-like", not how much.
+Not part of the DEBRA algorithm (Eqs. 1-29); here it is the baseline an
+enhancement gets compared against.
 RED = BT12.3 - BT10.4, GRN = BT11.2 - BT8.6 (gamma 2.5), BLU = BT10.4. The
 stretch values are **per sensor** — the scheme was tuned for SEVIRI and
 re-tuned for each later imager, so there is no single canonical set;

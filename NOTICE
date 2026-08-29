@@ -14,3 +14,6 @@ algorithm described in:
 
 The paper is not distributed with this software. This implementation is not
 produced, endorsed, or verified by the paper's authors, by CIRA, or by NOAA.
+
+Patent history for the DEBRA algorithm is documented in
+docs/patent-history.md.

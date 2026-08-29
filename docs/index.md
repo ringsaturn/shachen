@@ -72,6 +72,7 @@ guide
 equations
 api/index
 deviations
+patent-history
 ```
 
 ```{toctree}

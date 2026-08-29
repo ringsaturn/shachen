@@ -1,0 +1,110 @@
+[project]
+name = "shachen"
+version = "0.1.0"
+description = "Infrared satellite dust storm detection — an open implementation of the DEBRA-Dust algorithm for GOES ABI and Himawari AHI"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+    { name = "Han Xiao", email = "ringsaturn.me@gmail.com" }
+]
+requires-python = ">=3.12"
+keywords = [
+    "dust",
+    "dust-storm",
+    "sand-dust",
+    "DEBRA",
+    "satellite",
+    "remote-sensing",
+    "infrared",
+    "split-window",
+    "aerosol",
+    "GOES",
+    "ABI",
+    "Himawari",
+    "AHI",
+    "atmospheric-science",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+
+# Core tier: everything needed to run the whole algorithm — background,
+# composite, cloudmask, dust_tests, confidence, imagery, geo, solar, pipeline —
+# and nothing for I/O or plotting. Installing just this is enough to call
+# run_debra on xarray fields you already hold in memory.
+dependencies = [
+    "global-land-mask>=1.0.0",
+    "numpy>=2.5.2",
+    "pyorbital>=1.12.1",
+    "pyresample>=1.35.0",
+    "scipy>=1.18.1",
+    "xarray>=2026.7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ringsaturn/shachen"
+Repository = "https://github.com/ringsaturn/shachen"
+Issues = "https://github.com/ringsaturn/shachen/issues"
+Paper = "https://doi.org/10.1002/2017JD027365"
+
+# Splitting these out is safe because the heavy dependencies are imported
+# lazily: cartopy/matplotlib inside render, earthaccess inside the io loaders,
+# s3fs inside the fetch script. satpy is a module-level import in io/satellite,
+# but that module is not on the shachen/__init__ import chain. The upshot is
+# that `import shachen` pulls in none of these extras, which CI asserts.
+[project.optional-dependencies]
+# Reading and calibrating satellite L1b: io.satellite.load_scene
+satellite = [
+    "satpy>=0.45",
+    "dask>=2026.7.1",
+    "netcdf4>=1.7.4",
+]
+# Fetching ancillary data: io.merra and io.emissivity over Earthdata, plus the
+# S3 access in scripts/fetch_case
+data = [
+    "earthaccess>=0.18.0",
+    "netcdf4>=1.7.4",
+    "s3fs>=2026.7.0",
+]
+# Plotting: the coastlines and graticule in render.render_debra_png
+render = [
+    "cartopy>=0.25.0",
+    "matplotlib>=3.11.1",
+]
+all = [
+    "shachen[satellite,data,render]",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
+
+[build-system]
+requires = ["uv_build>=0.11.31,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+# Local development installs everything, so `uv sync && uv run pytest` works
+# straight out of a clone.
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.4",
+    "shachen[all]",
+]
+# Building docs/ needs no extras: satpy is the one module-level import in the
+# package, and conf.py mocks it; everything else is either core or lazy.
+docs = [
+    "furo>=2024.8.6",
+    "myst-parser>=4.0.0",
+    "sphinx>=8.1.3",
+    "sphinx-copybutton>=0.5.2",
+]

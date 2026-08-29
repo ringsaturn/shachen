@@ -1,0 +1,54 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite both this implementation and the
+  original algorithm paper listed under `references`.
+title: "shachen: infrared satellite dust storm detection"
+abstract: >-
+  An open Python implementation of DEBRA-Dust, the Dynamic Enhancement with
+  Background Reduction Algorithm for satellite-based dust storm detection,
+  supporting GOES ABI and Himawari AHI. Equations follow the 26 February 2020
+  erratum.
+type: software
+authors:
+  - family-names: Xiao
+    given-names: Han
+repository-code: "https://github.com/ringsaturn/shachen"
+license: Apache-2.0
+version: 0.1.0
+date-released: "2026-08-30"
+keywords:
+  - dust storm
+  - satellite remote sensing
+  - infrared
+  - split window
+  - DEBRA
+  - GOES ABI
+  - Himawari AHI
+references:
+  - type: article
+    scope: "The algorithm implemented by this software."
+    title: >-
+      A dynamic enhancement with background reduction algorithm: Overview and
+      application to satellite-based dust storm detection
+    authors:
+      - family-names: Miller
+        given-names: Steven D.
+      - family-names: Bankert
+        given-names: Richard L.
+      - family-names: Grasso
+        given-names: Louie D.
+      - family-names: Lindsey
+        given-names: Daniel T.
+      - family-names: Kuciauskas
+        given-names: Arunas P.
+      - family-names: Combs
+        given-names: Cynthia L.
+    journal: "Journal of Geophysical Research: Atmospheres"
+    year: 2017
+    volume: 122
+    start: 12938
+    end: 12959
+    doi: 10.1002/2017JD027365
+    notes: >-
+      This implementation follows the erratum published 26 February 2020, not
+      the equations as originally printed.

@@ -1,0 +1,11 @@
+data/
+output/
+tmp/
+__pycache__/
+.pytest_cache/
+*.pyc
+.DS_Store
+.venv/
+dist/
+.ruff_cache/
+docs/_build/

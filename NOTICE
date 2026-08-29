@@ -1,0 +1,16 @@
+shachen
+Copyright 2026 Han Xiao
+
+This product includes an independent implementation of the DEBRA-Dust
+algorithm described in:
+
+  Miller, S. D., Bankert, R. L., Grasso, L. D., Lindsey, D. T., Kuciauskas,
+  A. P., & Combs, C. L. (2017). A dynamic enhancement with background
+  reduction algorithm: Overview and application to satellite-based dust storm
+  detection. Journal of Geophysical Research: Atmospheres, 122, 12,938-12,959.
+  https://doi.org/10.1002/2017JD027365
+
+  Equations follow the erratum published 26 February 2020.
+
+The paper is not distributed with this software. This implementation is not
+produced, endorsed, or verified by the paper's authors, by CIRA, or by NOAA.

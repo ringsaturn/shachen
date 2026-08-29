@@ -1,0 +1,10 @@
+/* The equation-number column in the API overview table should not wrap. */
+table.docutils td:first-child,
+table.docutils th:first-child {
+  white-space: nowrap;
+}
+
+/* Module-level docstrings carry the paper citations; give them room. */
+dl.py.module > dd > p:first-child {
+  margin-top: 0.4rem;
+}

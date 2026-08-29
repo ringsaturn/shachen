@@ -1,0 +1,166 @@
+name: Release
+
+# Publishes a tagged version to PyPI and to GitHub Releases.
+#
+# To cut a release: bump `version` in pyproject.toml, commit, then push a tag
+# that matches it, e.g. `git tag v0.1.0 && git push origin v0.1.0`. The build
+# job refuses to run if the tag and pyproject disagree, so a mistyped tag fails
+# before anything is published.
+#
+# A tag containing `alpha`, `beta` or `rc` goes to TestPyPI and is marked as a
+# prerelease on GitHub; anything else goes to PyPI proper.
+#
+# workflow_dispatch builds and checks the artifacts without publishing them,
+# which is the way to rehearse a release.
+#
+# The GitHub Release is drafted, filled with assets, and only then published,
+# which is what GitHub's release immutability requires. Do not collapse those
+# two steps back into one.
+#
+# One-time setup: PyPI and TestPyPI trusted publishing (no API token needed) —
+# on each index add a publisher for repository `ringsaturn/shachen`, workflow
+# `release.yml`, environment `release`. Then Settings -> Environments -> `release`.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      # A tag that does not match pyproject.toml would publish a version nobody
+      # asked for, and PyPI uploads cannot be replaced. Catch it here.
+      - name: Tag matches pyproject version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          project="$(uv version --short)"
+          if [ "$tag" != "$project" ]; then
+            echo "Tag $GITHUB_REF_NAME implies version $tag, but pyproject.toml says $project"
+            exit 1
+          fi
+          echo "Releasing $project"
+
+      # shachen is pure Python: one sdist and one py3-none-any wheel cover
+      # every platform, so there is nothing to cross-build.
+      - name: Build
+        run: uv build
+
+      - name: Check metadata
+        run: uvx twine check --strict dist/*
+
+      # The wheel that is about to be published must at least import, with only
+      # the core dependencies installed — the same lean-install invariant ci.yml
+      # asserts against the source tree.
+      - name: Smoke-test the wheel
+        run: |
+          set -euo pipefail
+          uv venv /tmp/smoke
+          VIRTUAL_ENV=/tmp/smoke uv pip install dist/*.whl
+          VIRTUAL_ENV=/tmp/smoke /tmp/smoke/bin/python - <<'PY'
+          import sys
+
+          import shachen
+
+          leaked = {"satpy", "cartopy", "matplotlib", "earthaccess", "s3fs"} & set(sys.modules)
+          assert not leaked, f"core import pulled in extras: {sorted(leaked)}"
+          print("imported shachen from", shachen.__file__)
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    environment: release
+    permissions:
+      # Trusted publishing to PyPI, and signing the artifacts.
+      id-token: write
+      # Recording the build provenance attestation.
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "dist/*"
+
+      - name: Publish to TestPyPI
+        if: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist
+          skip-existing: true
+
+      - name: Publish to PyPI
+        if: ${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          skip-existing: true
+
+  github-release:
+    name: GitHub Release
+    # Only after the index accepted the upload, so a failed publish does not
+    # leave a release announcing a version nobody can install.
+    needs: publish
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      # Draft first, then publish as a separate step. This is required by
+      # GitHub's release immutability: publishing freezes the assets, so
+      # anything uploaded afterwards is rejected with "Cannot upload assets to
+      # an immutable release". Creating the release published and attaching
+      # files to it — what this action does by default — is exactly the
+      # sequence that fails (softprops/action-gh-release#653).
+      - name: Draft GitHub Release
+        id: draft
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          draft: true
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+
+      # Every asset is attached by now, so freezing the release is safe.
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false

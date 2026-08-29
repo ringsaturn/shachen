@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Sync
+        run: uv sync --locked --all-extras
+
+      - name: Lint
+        run: uv run ruff check src tests scripts
+
+      - name: Format
+        run: uv run ruff format --check src tests scripts
+
+      # No test needs the network: everything that would touch NASA Earthdata,
+      # AWS S3 or a downloaded reference case is guarded by a skipif on the
+      # data being present locally.
+      - name: Test
+        run: uv run pytest -q -rs
+
+      # The core install must stay small enough to be worth depending on, and
+      # `import shachen` must not drag in satpy/cartopy/matplotlib/earthaccess.
+      - name: Core install stays lean
+        run: |
+          uv venv /tmp/core
+          VIRTUAL_ENV=/tmp/core uv pip install .
+          VIRTUAL_ENV=/tmp/core /tmp/core/bin/python - <<'PY'
+          import sys
+          import shachen
+          leaked = {"satpy", "cartopy", "matplotlib", "earthaccess", "s3fs"} & set(sys.modules)
+          assert not leaked, f"core import pulled in extras: {sorted(leaked)}"
+          print("import shachen: no extras pulled in")
+          PY
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      # The docs group deliberately installs no extras: conf.py mocks satpy,
+      # and every other optional import is inside a function.
+      - name: Sync
+        run: uv sync --locked --group docs --no-default-groups
+
+      # -W: a broken cross-reference or a page left out of the toctree fails
+      # the build rather than shipping a hole in the site.
+      - name: Build docs
+        run: uv run sphinx-build -b html -W --keep-going docs docs/_build/html
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docs-html
+          path: docs/_build/html

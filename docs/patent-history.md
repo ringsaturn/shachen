@@ -23,7 +23,7 @@ legal advice.
 | Priority | Provisional 61/756,555, 2013-01-25 |
 | Granted | 2016-07-05 |
 | Nominal expiration | 2034-09-01 |
-| **Actual status** | **Expired 2024-07-05** for non-payment of the 8th-year maintenance fee (37 CFR 1.362) |
+| Actual status | Expired 2024-07-05 for non-payment of the 8th-year maintenance fee (37 CFR 1.362) |
 
 The USPTO legal-event record: the 4th-year maintenance fee was paid
 (2019-12-18), the 8th-year reminder was mailed 2024-02-26, no payment
@@ -32,20 +32,20 @@ No petition to reinstate appears in the Google Patents legal-event record as
 of the verification date. Whether one is pending in the USPTO's own
 transaction history has not been checked; Patent Center requires a login.
 
-## No patent ever existed outside the United States
+## No patent outside the United States
 
 The patent's only family member (DOCDB family 51223030) is PCT application
 [WO 2014/116472 A1](https://patentscope.wipo.int/search/en/detail.jsf?docId=WO2014116472)
-(PCT/US2014/011586), which **ceased without entering the national phase in
-any country**. There has never been a corresponding patent in Japan, China,
-Europe, or anywhere else. There are also no continuations, divisionals, or
-continuations-in-part *within this family*: application 14/150,467 is the
-only US member of DOCDB family 51223030.
+(PCT/US2014/011586), which ceased without entering the national phase in any
+country. There has never been a corresponding patent in Japan, China, Europe,
+or anywhere else. There are also no continuations, divisionals, or
+continuations-in-part within this family: application 14/150,467 is the only
+US member of DOCDB family 51223030.
 
 ```{note}
 That statement is scoped to the family. A later application by the same
 inventor — an ABI adaptation, or an ash or fog variant — would not appear
-in family 51223030 and is **not** covered here. Establishing that would take
+in family 51223030 and is not covered here. Establishing that would take
 an inventor-name search of the USPTO full-text database, which has not been
 done.
 ```
@@ -71,7 +71,7 @@ here as provenance for anyone cross-checking where a number came from:
 | Terminator weighting | threshold on cos θ > 0.383 | zenith-band blending, exponent 1.5 |
 | RGB composition: CF cap / blue dimming / gun max | 0.5 / 0.1 / 1.2 | 0.5 / 0.1 / 1.2 |
 
-## Lineage: the algorithm evolved over sixteen years
+## Lineage, 2001–2017
 
 ```{note}
 This section is a reconstruction assembled from public documents — the
@@ -83,12 +83,11 @@ confirmed by Steven D. Miller, the Naval Research Laboratory, CIRA, or
 Colorado State University.
 ```
 
-The 2013 application is not where the algorithm starts. Its two
-predecessors — US 7,242,803 (application 10/713,908, recited on the
-US 7,379,592 front page as filed 2003-01-21) and its continuation-in-part
-US 7,379,592 (application 10/885,526, filed 2004-06-30) — describe a
-product that was already in routine operational use and had already been
-revised. Automated processing of the SeaWiFS data "commenced Aug. 8, 2001";
+The algorithm predates the 2013 application. Its two predecessors —
+US 7,242,803 (application 10/713,908, recited on the US 7,379,592 front page
+as filed 2003-01-21) and its continuation-in-part US 7,379,592 (application
+10/885,526, filed 2004-06-30) — describe a product that was already in
+routine operational use and had already been revised. Automated processing of the SeaWiFS data "commenced Aug. 8, 2001";
 the dust case in Fig. 3 was captured at the Navy Regional Center in Rota,
 Spain, on 2001-02-13 1255Z, one of the three receiving stations named in
 the text along with Bahrain and Yokosuka.
@@ -181,13 +180,12 @@ $T_{\text{dyn}}$ is a temperature floor that moves with the scene, computed
 from the scene's own $T_{\max}(31)$. The stated reason for it is that "the
 dynamic temperature scaling (Equation 4) was introduced to reduce seasonal
 and diurnal effects giving rise to false detection over cold land." That is
-a background estimate that adapts to the scene, and it can be read as the
-ancestor of the "Dynamic" in DEBRA — though the sources do not draw that
-line themselves. The step between 2004 and 2013 then appears to be one of
-provenance rather than of principle: the background stops being a statistic
-of the current scene and becomes an external prior — a surface emissivity
-database plus a skin-temperature reanalysis — which is what this package
-implements in `background.py`.
+a background estimate that adapts to the scene, the same property that names
+the "Dynamic" in DEBRA; the sources do not state that connection themselves.
+Between 2004 and 2013 the background changes source rather than principle: it
+stops being a statistic of the current scene and becomes an external prior, a
+surface emissivity database plus a skin-temperature reanalysis, which is what
+this package implements in `background.py`.
 
 ### Where the constants come from
 
@@ -203,8 +201,8 @@ algorithms (over-land and water) tuned to maintain a similar enhancement of
 dust crossing coastlines", so that a dust front "maintains a similar
 appearance across the land/sea algorithmic boundary." The specification
 also records that "performance testing for the new method is ongoing, with
-only minor corrections to scaling bounds anticipated" — the document
-describes work in progress, not a settled result.
+only minor corrections to scaling bounds anticipated": the document describes
+work in progress.
 
 ### Two transcription caveats
 
@@ -216,8 +214,8 @@ describes work in progress, not a settled result.
 - The specification refers twice to "the computer program code listing in
   the Appendix", but the granted text of US 7,379,592 B2 is 18 columns of
   specification with 2 claims and 14 sheets of drawings, and contains no
-  code listing. **The patent as published contains no reference
-  implementation.** Whether the appendix was filed can only be settled from
+  code listing. The patent as published contains no reference implementation.
+  Whether the appendix was filed can only be settled from
   the image file wrapper of 10/885,526 or of the parent 10/713,908; that has
   not been checked.
 

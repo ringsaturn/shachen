@@ -89,7 +89,7 @@ def _interp_to_time(dataset: xr.Dataset, when: dt.datetime) -> xr.Dataset:
 
     MERRA-2 hourly means are stamped at half past the hour (00:30, 01:30,
     ...), so a scan on the whole hour at either end of a day file — 00:00
-    UTC, say — falls *outside* that axis. Plain ``interp`` extrapolates to
+    UTC, say — falls outside that axis. Plain ``interp`` extrapolates to
     NaN there, and a NaN skin temperature silently empties every field
     downstream of the background and the cloud mask. Clamping reads the
     nearest hourly mean instead (00:00 gets the 00:30 mean, half an hour

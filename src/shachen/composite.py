@@ -3,13 +3,13 @@
 The emissivity-free alternative to :mod:`shachen.background`: stack the same
 time-of-day scenes from the preceding ~14 days and, per pixel, keep the three
 TIR brightness temperatures from the day with the warmest BT10.4 (clouds are
-cold; the warmest day is the best clear-sky estimate). Because the composite
-is built from real observations it carries the split-window water-vapor
-depression the semianalytic (emissivity x Planck, no atmosphere) background
-lacks — the ~1 K high bias that zeroes DT1/DT2 on transparent winter plumes
-(see docs/deviations.md).
+cold; the warmest day is taken as the clear-sky estimate). Because the
+composite is built from real observations it carries the split-window
+water-vapor depression the semianalytic (emissivity x Planck, no atmosphere)
+background lacks: the ~1 K high bias that zeroes DT1/DT2 on transparent winter
+plumes (see docs/deviations.md).
 
-Spectral coherence: all three bands come from the *same* selected day, and a
+Spectral coherence: all three bands come from the same selected day, and a
 day is a candidate at a pixel only where all three bands are finite there.
 """
 

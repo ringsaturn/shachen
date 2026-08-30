@@ -1,9 +1,9 @@
 # Equations
 
 Every numbered equation of Miller et al. (2017), in the form this package
-actually implements — i.e. the **26 February 2020 erratum** for Eqs. 7, 21, 22,
-24 and 25, and the three prose-based corrections argued out in
-[Deviations](deviations.md), each flagged below.
+implements: the 26 February 2020 erratum for Eqs. 7, 21, 22, 24 and 25, and the
+three prose-based corrections argued out in [Deviations](deviations.md), each
+flagged below.
 
 Brightness temperatures are written $T_{\lambda}$ for the band centred near
 $\lambda$ µm; $\theta$ is the solar zenith angle.
@@ -11,20 +11,20 @@ $\lambda$ µm; $\theta$ is the solar zenith angle.
 ## The normalization primitive
 
 Almost every test is a clipped linear ramp between a MIN and a MAX bound
-(Eq. 3), which is where all the tuning lives:
+(Eq. 3), which is where the tuning constants enter:
 
 $$
 N(x; x_{\min}, x_{\max}) = \operatorname{clip}\!\left(
 \frac{x - x_{\min}}{x_{\max} - x_{\min}},\; 0,\; 1 \right)
 $$
 
-`MIN` may exceed `MAX`, which simply reverses the ramp; the cos-zenith blends
+`MIN` may exceed `MAX`, which reverses the ramp; the cos-zenith blends
 below rely on that. → {func}`shachen.norm.normalize`
 
 ## Clear-sky background (§3.2)
 
-The dynamic background is what separates DEBRA from a fixed-threshold test.
-Two ways to get it.
+The dynamic background separates DEBRA from a fixed-threshold test. It is
+estimated by one of two schemes.
 
 **Scheme A, semi-analytic.** Surface emissivity $\varepsilon_\lambda$ modifies
 the Planck radiance of the reanalysis skin temperature, inverted back to a
@@ -42,8 +42,9 @@ $\varepsilon = 1$, which makes the transform the identity.
 → {func}`shachen.background.background_signals`
 
 **Scheme B, cloud-cleared composite.** Over a stack of $n$ same-time-of-day
-scenes, take the warmest window pixel — clouds are cold, so the warmest day is
-the best clear-sky estimate — and read all three bands from that same day $d^*$:
+scenes, take the warmest window pixel and read all three bands from that same
+day $d^*$. Clouds are cold, so the warmest day is taken as the clear-sky
+estimate:
 
 $$
 d^{*} = \operatorname*{arg\,max}_{d \in \mathcal{C}} \; T_{10.4}^{(d)},
@@ -82,8 +83,8 @@ not masked away as cloud. → {func}`shachen.cloudmask.cloud_mask`
 \end{align*}
 ```
 
-The restoral terms — a pixel that looks like dust in the reverse split window
-subtracts from the cloud confidence:
+The restoral terms: a pixel that looks like dust in the reverse split window
+subtracts from the cloud confidence.
 
 ```{math}
 :nowrap:
@@ -113,14 +114,14 @@ Combined, then put on a common scale:
 ```
 
 $^\dagger$ Eq. 4 is implemented magnitude-reversed; as printed it saturates the
-mask over clear sky. $^\ddagger$ Eq. 11 uses CM3, not the misprinted CM4 — the
-3.9 µm test is night-only. Both are argued in
+mask over clear sky. $^\ddagger$ Eq. 11 uses CM3 in place of the misprinted
+CM4: the 3.9 µm test is night-only. Both are argued in
 [Deviations](deviations.md#2-corrections-to-equations-the-erratum-does-not-cover).
 
 ## Dust tests (Eqs. 13–15)
 
-DT1 and DT2 are the same ramp as Eq. 3 with the **per-pixel background as the
-MIN bound** — that substitution is the whole idea of the algorithm. Writing the
+DT1 and DT2 are the same ramp as Eq. 3 with the per-pixel background as the
+MIN bound; that substitution is what makes the test dynamic. Writing the
 observed signals $\mathrm{RSW} = T_{12.3} - T_{10.4}$ and
 $\mathrm{BTD} = T_{8.6} - T_{10.4}$:
 
@@ -137,8 +138,8 @@ $\mathrm{BTD} = T_{8.6} - T_{10.4}$:
 \end{align*}
 ```
 
-DT3 is the thermal-contrast consensus builder, implemented magnitude-reversed
-per the paper's prose ("observations that are relatively cold compared to MERRA
+DT3 is the thermal-contrast test, implemented magnitude-reversed per the
+paper's prose ("observations that are relatively cold compared to MERRA
 produce high value for DT3"):
 
 ```{math}
@@ -176,8 +177,8 @@ stop being independent without solar heating.
 \end{align*}
 ```
 
-The terminator is crossed smoothly, with weights evaluated in
-**cosine-zenith** space:
+The terminator is crossed smoothly, with weights evaluated in cosine-zenith
+space:
 
 ```{math}
 :nowrap:
@@ -202,8 +203,7 @@ B_{\text{trm}}^{\text{day}} &= N(\cos\theta;\; \cos 90^{\circ},\; \cos 75^{\circ
 \end{equation*}
 ```
 
-$\mathrm{CF}_{\text{comb}} \in [0, 1]$ is the field the whole package exists to
-produce.
+$\mathrm{CF}_{\text{comb}} \in [0, 1]$ is the algorithm's output field.
 
 ## Enhanced imagery (Eqs. 23–29)
 
@@ -226,9 +226,9 @@ B_{\text{bg}} &= 1 - N(\theta;\; 79^{\circ},\; 89^{\circ})^{1.5}
 \end{align*}
 ```
 
-Note that Eq. 25 is evaluated in zenith **degree** space, unlike the cos-space
-Eqs. 20–21. Each gun then gets the same form, differing only in how much of the
-confidence factor it lets through:
+Eq. 25 is evaluated in zenith degree space, unlike the cos-space Eqs. 20–21.
+Each gun then gets the same form, differing only in the coefficient $D_G$
+applied to the confidence factor:
 
 $$
 G = N\!\left(\mathrm{BI}\left(1 - \min(\mathrm{CF}_{\text{comb}}, 0.5)\right)
@@ -247,5 +247,5 @@ yellow. The paper's §4.2 alternatives are generalised in
 | `green` | $(0.10,\ 1.0,\ 0.10)$ |
 | `blue` | $(0.25,\ 0.25,\ 1.0)$ |
 
-The $\min(\mathrm{CF}, 0.5)$ cap is what keeps dust translucent: even at full
+The $\min(\mathrm{CF}, 0.5)$ cap keeps dust translucent: even at full
 confidence, half the underlying scene still shows through.

@@ -2,7 +2,7 @@
 
 Builds the day/night blended baseline image (Eqs. 23-26) and modulates it by
 the combined confidence factor in each color gun (Eqs. 27-29). Pure array
-numerics; map rendering lives in :mod:`shachen.render`.
+numerics; map rendering is in :mod:`shachen.render`.
 """
 
 import numpy as np

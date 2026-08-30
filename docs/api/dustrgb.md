@@ -4,15 +4,15 @@ The standard operational infrared dust composite: three fixed band-difference
 stretches that make lofted mineral dust read pink to magenta over dark
 blue-green surfaces, day and night. Forecasters have used it on SEVIRI, ABI and
 AHI for years; it needs no ancillary data and no cloud mask, which is both why
-it is cheap to run and why it has no notion of how dusty a pixel is.
+it is cheap to run and why it produces no per-pixel measure of dust amount.
 [`shachen.pipeline.run_dust_rgb`](pipeline.md) is the entry point.
 
-In this package it also serves as the comparison baseline for DEBRA-Dust — the
-image to put next to an enhancement to see what the enhancement bought.
+In this package it also serves as the comparison baseline for DEBRA-Dust: the
+image to put next to an enhancement to see what the enhancement changed.
 
-## The stretches are per sensor
+## Per-sensor stretches
 
-The Dust RGB has **no single canonical set of numbers**. It was tuned for
+The Dust RGB has no single canonical set of numbers. It was tuned for
 Meteosat SEVIRI and then re-tuned for each later imager, because the
 corresponding channels do not sit at the same wavelengths — most visibly in the
 green gun, where SEVIRI's `IR10.8 − IR8.7` becomes `11.2 − 8.4` on ABI. Berndt
@@ -21,9 +21,8 @@ produced ABI-specific versions of the Ash, Convection and Night Microphysics
 RGBs alongside Dust.
 
 `run_dust_rgb` therefore reads `scene.attrs["reader"]` and picks the set that
-sensor's **operational** product uses, so a baseline rendered here is the image
-forecasters actually look at rather than a recipe borrowed from another
-satellite:
+sensor's operational product uses, so a baseline rendered here matches the
+image forecasters see:
 
 | Reader | Constant | Red 12.3 − 10.3 | Green 11.2 − 8.4 (γ 2.5) | Blue 10.3 |
 |---|---|---|---|---|
@@ -33,8 +32,8 @@ satellite:
 Himawari gets the original SEVIRI values because no re-tuned AHI recipe has been
 published; that is also what satpy renders, since it ships a `dust_abi`
 enhancement but no `dust_ahi`. An unknown or absent reader falls back to the
-same SEVIRI set. Pass `constants=` explicitly to pin one set across sensors —
-which is what you want when comparing the two, not when producing a baseline.
+same SEVIRI set. Pass `constants=` explicitly to pin one set across sensors,
+which applies when comparing two sensors on identical numbers.
 
 The bands themselves never change: `DEBRA_BANDS` plus 11.2 µm, the one channel
 DEBRA never reads.

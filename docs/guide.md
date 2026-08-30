@@ -2,14 +2,14 @@
 
 ## Install
 
-The core install is small — it runs the entire algorithm on fields you already
-have in memory, and pulls in no I/O or plotting stack:
+The core install runs the entire algorithm on fields already in memory, and
+pulls in no I/O or plotting stack:
 
 ```sh
 pip install shachen
 ```
 
-Add what you need on top:
+Optional extras:
 
 ```sh
 pip install "shachen[satellite]"   # satpy: read and calibrate ABI/AHI L1b
@@ -23,7 +23,7 @@ pip install "shachen[all]"         # everything, for the reproduction scripts
 ## The scene contract
 
 Every stage works on the sensor's 2 km fixed grid. A *scene* is an
-{class}`xarray.Dataset` whose variables are named by DEBRA **role**, not by
+{class}`xarray.Dataset` whose variables are named by DEBRA role rather than by
 sensor channel, so ABI and AHI share one code path:
 
 | Variable | Unit | Role |
@@ -69,15 +69,14 @@ result["cm_norm_day"]  # normalised daytime cloud mask
 result["zenith_deg"]  # per-pixel solar zenith
 ```
 
-`skin_temperature` is MERRA-2 `TS` (K) **on its native lat/lon grid** — the
-pipeline regrids it for you via {func}`shachen.geo.regrid_latlon`. Pixels with
+`skin_temperature` is MERRA-2 `TS` (K) on its native lat/lon grid; the
+pipeline regrids it via {func}`shachen.geo.regrid_latlon`. Pixels with
 NaN inputs (off-disk, bad pixels) carry NaN confidence throughout.
 
 ### Choosing a background
 
-The clear-sky background is what makes DEBRA dynamic, and there are two ways to
-estimate it. Exactly one must be given — passing both, or neither, raises
-`ValueError`.
+The clear-sky background is estimated per pixel, by one of two schemes.
+Exactly one must be given: passing both, or neither, raises `ValueError`.
 
 **Scheme A — semi-analytic** (paper §3.2, Option A). Per-band surface
 emissivity modifies the Planck radiance of the MERRA-2 skin temperature, and
@@ -101,7 +100,7 @@ result = shachen.run_debra(scene, skin_temperature=merra_ts, background=bg)
 ```
 
 Scheme B is built from real observations, so it carries the split-window
-water-vapour depression that the atmosphere-free scheme A lacks — the ~1 K high
+water-vapour depression that the atmosphere-free scheme A lacks: the ~1 K high
 bias that zeroes DT1/DT2 on transparent winter plumes. Its per-pixel candidate
 count is passed through to the output as `n_valid`.
 
@@ -122,14 +121,14 @@ from shachen.constants import ABI_TUNED
 result = shachen.run_debra(..., constants=ABI_TUNED)
 ```
 
-{data}`shachen.constants.ABI_TUNED` is the one shipped retune — it raises the
+{data}`shachen.constants.ABI_TUNED` is the only shipped retune. It raises the
 Eq. 19 lower bound from 0.25 to 0.40 to suppress a clear-sky DT3 floor specific
 to the ABI + MERRA-2 + CAMEL stack. The reasoning and the numbers are in
 [Deviations](deviations.md).
 
 ## Enhanced imagery
 
-The confidence field becomes a picture in two steps (Eqs. 23–29): a day/night
+The confidence field is rendered in two steps (Eqs. 23–29): a day/night
 blended greyscale baseline, then a per-gun colour modulation by `cf_comb`.
 
 ```python
@@ -160,7 +159,7 @@ without the `render` extra.
 ## Reproducing a reference case
 
 End to end reproduction needs `[all]` plus an
-[Earthdata](https://urs.earthdata.nasa.gov/) login in `~/.netrc` — MERRA-2 and
+[Earthdata](https://urs.earthdata.nasa.gov/) login in `~/.netrc`: MERRA-2 and
 CAMEL are authenticated downloads, while GOES L1b on AWS S3 is anonymous:
 
 ```sh

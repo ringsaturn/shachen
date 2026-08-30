@@ -1,7 +1,7 @@
 # shachen (沙尘)
 
-Infrared satellite **dust storm detection** in Python — an open implementation
-of **DEBRA-Dust**, the Dynamic Enhancement with Background Reduction Algorithm
+Infrared satellite dust storm detection in Python — an open implementation
+of DEBRA-Dust, the Dynamic Enhancement with Background Reduction Algorithm
 ([Miller et al. 2017](https://doi.org/10.1002/2017JD027365)), for GOES ABI and
 Himawari AHI.
 
@@ -15,13 +15,13 @@ attaches that PDF, and a zip of this site, to its
 <a class="reference external" href="https://github.com/ringsaturn/shachen/releases">GitHub Release</a>.</p>
 ```
 
-```{admonition} Erratum, not the original print run
+```{admonition} Equations follow the 2020 erratum
 :class: important
 
-All equations follow the erratum published 26 February 2020, not the figures
-as originally printed — plus three further corrections documented in
-[Deviations](deviations.md). Read that page before changing any constant or
-sign convention.
+All equations follow the erratum published 26 February 2020, which supersedes
+the 2017 print run for Eqs. 7, 21–22 and 24–25, plus three further corrections
+documented in [Deviations](deviations.md). Read that page before changing any
+constant or sign convention.
 ```
 
 ![DEBRA-Dust enhanced imagery from GOES-16 ABI and Himawari-8 AHI](img/dust-cases.png)
@@ -30,11 +30,11 @@ Dust is the yellow modulation; everything else stays in greyscale infrared.
 
 ## What it does
 
-DEBRA turns the split-window infrared signal that is specific to *mineral*
+DEBRA turns the split-window infrared signal that is specific to mineral
 dust into a per-pixel confidence field, by comparing each pixel against a
-dynamically estimated **clear-sky background** rather than a fixed threshold.
-That background is what lets it work over bright, emissivity-heterogeneous
-desert surfaces where fixed thresholds produce false alarms.
+dynamically estimated clear-sky background rather than a fixed threshold.
+Over bright, emissivity-heterogeneous desert surfaces, fixed thresholds
+produce false alarms; the dynamic background removes that dependence.
 
 ```
 io.satellite.load_scene   L1b → bt_* / refl_* on the 2 km fixed grid (satpy)

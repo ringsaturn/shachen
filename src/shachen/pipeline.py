@@ -2,7 +2,7 @@
 
 :func:`run_debra` is DEBRA, Eqs. 1-22: regrid ancillary onto the scene grid,
 derive solar zenith and land mask, then chain background -> cloud mask ->
-dust tests -> confidence. Enhanced imagery (Eqs. 23-29) lives in
+dust tests -> confidence. Enhanced imagery (Eqs. 23-29) is in
 :mod:`shachen.imagery`.
 
 :func:`run_dust_rgb` is the classic Dust RGB baseline, which needs no
@@ -157,14 +157,14 @@ def run_dust_rgb(scene: xr.Dataset, constants: DustRGBConstants | None = None) -
     (11.2 um is the extra band DEBRA itself never reads). A scene loaded with
     ``roles=DEBRA_BANDS`` therefore raises ValueError here.
 
-    **The stretches are per sensor.** Unlike DEBRA, the Dust RGB has no one
+    The stretches are per sensor. Unlike DEBRA, the Dust RGB has no one
     canonical set of numbers: it was tuned for SEVIRI and then re-tuned for each
     later imager, because the corresponding channels do not sit at the same
     wavelengths. With ``constants=None`` (the default) the set is chosen from
     ``scene.attrs["reader"]`` through :data:`shachen.constants.DUST_RGB_BY_READER`
     — ABI gets the Quick Guide's adjusted values, AHI the original SEVIRI ones —
-    so the baseline matches that sensor's operational product rather than a
-    recipe borrowed from another satellite. An unknown or absent reader falls
+    so the baseline matches that sensor's operational product. An unknown or
+    absent reader falls
     back to :data:`shachen.constants.DUST_RGB` (SEVIRI); pass ``constants``
     explicitly to pin one set across sensors, e.g. to compare the two.
 

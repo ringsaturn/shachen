@@ -10,7 +10,7 @@ def normalize(x, bounds: Bounds):
 
     Works on scalars, numpy arrays, and xarray DataArrays. ``bounds.min`` may
     exceed ``bounds.max`` (used for the cos-zenith blends specified in
-    zenith-angle space): the sense of the ramp simply reverses.
+    zenith-angle space): the sense of the ramp reverses.
     """
     return np.clip((x - bounds.min) / (bounds.max - bounds.min), 0.0, 1.0)
 

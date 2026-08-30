@@ -195,7 +195,7 @@ class DustRGBConstants:
 
 #: The original SEVIRI stretches (Lensky and Rosenfeld 2008, as formalised in
 #: EUMeTrain's recipe compilation; satpy's generic ``dust_default``
-#: enhancement). Applied to Himawari here, which is what satpy does too — it
+#: enhancement). Applied to Himawari here, which is what satpy does too: it
 #: ships no ``dust_ahi`` override. Also the fallback for an unknown sensor.
 DUST_RGB = DustRGBConstants()
 
@@ -212,8 +212,8 @@ DUST_RGB_ABI = DustRGBConstants(
 
 #: satpy reader -> the stretch set that sensor's operational product uses.
 #: :func:`shachen.pipeline.run_dust_rgb` reads this off ``scene.attrs["reader"]``
-#: so a baseline rendered here matches what forecasters actually look at. The
-#: same rule is why there is no single "classic" recipe to freeze: the scheme is
+#: so a baseline rendered here matches the image forecasters see. The same
+#: rule is why there is no single canonical recipe to freeze: the scheme is
 #: retuned per imager (satpy carries ``ash_abi``, ``convection_abi`` and the
 #: night-microphysics variants for the same reason).
 DUST_RGB_BY_READER: dict[str, DustRGBConstants] = {

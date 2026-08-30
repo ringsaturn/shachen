@@ -123,6 +123,13 @@ latex_documents = [
     ("index", "shachen.tex", "shachen — DEBRA-Dust", author, "manual"),
 ]
 
+# Sphinx indexes xelatex builds with xindy by default. MacTeX bundles it, the
+# Debian texlive packages do not ship it at all, and installing it would drag
+# clisp into CI for no gain: the index is a list of Python identifiers, ASCII
+# to the last entry, which makeindex — part of texlive-binaries everywhere —
+# sorts just as well. Turning it off keeps one indexer for every machine.
+latex_use_xindy = False
+
 latex_show_urls = "footnote"
 
 # The cover image is not referenced from any page, so Sphinx would not copy it

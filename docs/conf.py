@@ -5,6 +5,7 @@ Build with ``uv run --group docs sphinx-build -b html docs docs/_build/html``
 never drifts from the package.
 """
 
+import os
 import tomllib
 from pathlib import Path
 
@@ -13,8 +14,17 @@ _PYPROJECT = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.tom
 project = "shachen"
 author = "Han Xiao"
 copyright = "2026, Han Xiao — Apache-2.0"
-release = _PYPROJECT["project"]["version"]
-version = release
+
+# The number in pyproject.toml is the truth for a tagged build: that build
+# really is that release. It is a half-truth for the site published from main,
+# which is usually a few commits ahead of the last tag — a reader comparing the
+# page against the version they installed from PyPI would be reading about code
+# that has not shipped. So the docs workflow passes a PEP 440 local version,
+# `0.2.1+g3fee821`, naming the commit the site was actually built from; nothing
+# else (a plain `make -C docs html`, a PR build) sets it, and the bare version
+# stands.
+version = _PYPROJECT["project"]["version"]
+release = os.environ.get("SHACHEN_DOCS_RELEASE") or version
 
 extensions = [
     "sphinx.ext.autodoc",

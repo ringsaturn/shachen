@@ -1,0 +1,74 @@
+name: Build docs
+description: >
+  Builds the Sphinx site into docs/_build/html and the PDF manual into
+  docs/_build/latex/shachen.pdf, then copies the PDF to the root of the HTML
+  tree so the published site can offer it as a download.
+
+runs:
+  using: composite
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        python-version: "3.13"
+        enable-cache: true
+
+    # The docs group deliberately installs no extras: conf.py mocks satpy,
+    # and every other optional import is inside a function.
+    - name: Sync
+      shell: bash
+      run: uv sync --locked --group docs --no-default-groups
+
+    # The exact set docs/Makefile documents. conf.py typesets with xelatex and
+    # asks for two font families that ship with TeX Live — DejaVu Sans Mono
+    # (fonts-extra) for the box-drawing glyphs and Fandol (lang-chinese) for
+    # the Chinese in the project name — so nothing else has to be installed.
+    - name: Install TeX Live
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          latexmk \
+          texlive-xetex \
+          texlive-latex-extra \
+          texlive-fonts-extra \
+          texlive-lang-chinese
+
+    # A tag build documents exactly the version in pyproject.toml, so it is
+    # labelled with that and nothing else. Any other build — the site deployed
+    # from main, a release rehearsal — is some number of commits past the last
+    # tag, so it is labelled `<version>+g<short sha>`: the reader can tell at a
+    # glance that the page is ahead of what PyPI holds, and can tell exactly
+    # how far. conf.py falls back to the bare version when this is unset.
+    - name: Label the build
+      shell: bash
+      run: |
+        set -euo pipefail
+        version="$(uv version --short)"
+        if [ "${GITHUB_REF_TYPE:-branch}" = "tag" ]; then
+          label="$version"
+        else
+          label="$version+g${GITHUB_SHA:0:7}"
+        fi
+        echo "Building the docs as $label"
+        echo "SHACHEN_DOCS_RELEASE=$label" >> "$GITHUB_ENV"
+
+    # -W: a broken cross-reference or a page left out of the toctree fails
+    # the build rather than shipping a hole in the site.
+    - name: Build HTML
+      shell: bash
+      run: uv run sphinx-build -b html -W --keep-going docs docs/_build/html
+
+    - name: Build PDF
+      shell: bash
+      run: |
+        set -euo pipefail
+        uv run sphinx-build -b latex -W --keep-going docs docs/_build/latex
+        make -C docs/_build/latex
+
+    # docs/index.md links to /shachen.pdf, so the file has to sit next to
+    # index.html rather than in the LaTeX build directory.
+    - name: Add the PDF to the site
+      shell: bash
+      run: cp docs/_build/latex/shachen.pdf docs/_build/html/shachen.pdf

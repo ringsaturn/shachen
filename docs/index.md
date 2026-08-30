@@ -8,6 +8,13 @@ Himawari AHI.
 *shachen* (沙尘) is Chinese for "sand and dust". The package is a home for
 infrared-channel dust algorithms; DEBRA-Dust is the first one.
 
+```{raw} html
+<p>The whole manual is also available as a single PDF:
+<a class="reference external" href="shachen.pdf">shachen.pdf</a>. Every release
+attaches that PDF, and a zip of this site, to its
+<a class="reference external" href="https://github.com/ringsaturn/shachen/releases">GitHub Release</a>.</p>
+```
+
 ```{admonition} Erratum, not the original print run
 :class: important
 

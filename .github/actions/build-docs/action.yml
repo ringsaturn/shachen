@@ -43,18 +43,36 @@ runs:
           fonts-freefont-otf \
           fonts-dejavu-core
 
-    # A tag build documents exactly the version in pyproject.toml, so it is
-    # labelled with that and nothing else. Any other build — the site deployed
-    # from main, a release rehearsal — is some number of commits past the last
-    # tag, so it is labelled `<version>+g<short sha>`: the reader can tell at a
-    # glance that the page is ahead of what PyPI holds, and can tell exactly
-    # how far. conf.py falls back to the bare version when this is unset.
+    # A build of a released commit documents exactly the version in
+    # pyproject.toml, so it is labelled with that and nothing else. Any other
+    # build — the site deployed from main, a release rehearsal — is some number
+    # of commits past the last tag, so it is labelled `<version>+g<short sha>`:
+    # the reader can tell at a glance that the page is ahead of what PyPI
+    # holds, and can tell exactly how far. conf.py falls back to the bare
+    # version when this is unset, and turns the `+g` into a banner on the page.
+    #
+    # The question is whether *this commit* is released, not whether the ref we
+    # were pushed as happens to be a tag. Those differ where it matters: the
+    # release flow commits the version bump to main and only then pushes the
+    # tag, so docs.yml rebuilds the site from a commit that is about to become
+    # v<version> — under a `GITHUB_REF_TYPE = tag` test the published site
+    # would spend the whole quiet period after a release calling itself a
+    # development build of a version it is byte-for-byte identical to.
+    #
+    # `--points-at` rather than `git describe --exact-match`: it needs no
+    # history walk, so it is honest on the depth-1 clone actions/checkout
+    # leaves behind. The `v*` filter keeps some future non-version tag from
+    # promoting a build to "released".
     - name: Label the build
       shell: bash
       run: |
         set -euo pipefail
+        # checkout fetches no tags by default. If this fails there is nothing
+        # to answer the question with, and the honest fallback is the dev
+        # label — a flaky fetch should not fail a release.
+        git fetch origin --tags --depth=1 --quiet || true
         version="$(uv version --short)"
-        if [ "${GITHUB_REF_TYPE:-branch}" = "tag" ]; then
+        if [ -n "$(git tag --points-at HEAD --list 'v*')" ]; then
           label="$version"
         else
           label="$version+g${GITHUB_SHA:0:7}"

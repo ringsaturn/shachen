@@ -112,6 +112,29 @@ html_theme_options = {
     ],
 }
 
+# `0.2.1+g3fee821` in the sidebar says "ahead of the last tag" only to a reader
+# who reads PEP 440 local versions for pleasure. Everyone else sees a version
+# number and takes the page at its word. So say it in prose, on every page of
+# the site built from main, with a way out to the version PyPI actually holds.
+#
+# The banner deliberately names no release number: between the version bump and
+# the tag push, pyproject.toml already carries a version that has not shipped,
+# and a banner that announced it would be pointing at a release that does not
+# exist yet. `releases/latest` is always right. A build of a tagged commit gets
+# no banner — it documents exactly the version it claims to.
+#
+# Keep the text to one short line: Furo lays the announcement out as a single
+# row of the header's height, `white-space: nowrap`, so anything longer scrolls
+# sideways instead of wrapping. This is HTML only — the PDF built from main
+# carries the `+g<sha>` on its title page and nothing more.
+if "+g" in release:
+    html_theme_options["announcement"] = (
+        f"You are reading the development docs, built from <code>main</code> "
+        f"at <code>{release}</code> &mdash; ahead of the "
+        f'<a href="https://github.com/ringsaturn/shachen/releases/latest">'
+        f"latest release</a>."
+    )
+
 # -- LaTeX / PDF -------------------------------------------------------------
 
 # xelatex, not the pdflatex default: the docs carry CJK (沙尘), the box-drawing

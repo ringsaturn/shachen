@@ -133,7 +133,10 @@ latex_elements = {
     "papersize": "a4paper",
     "pointsize": "11pt",
     # Both font families ship with TeX Live, so the PDF builds identically on
-    # any machine — no system fonts, nothing to install beyond a TeX distro.
+    # any machine — no system fonts to hunt down. (Debian and Ubuntu split the
+    # font files into separate packages and attach them to the texlive ones as
+    # Recommends, so a --no-install-recommends install has to name them; see
+    # .github/actions/build-docs.)
     # DejaVu Sans Mono covers the box-drawing glyphs of the pipeline diagram,
     # Fandol covers the Chinese in the project name, and the newunicodechar
     # fallbacks catch the handful of symbols Latin Modern lacks in text mode

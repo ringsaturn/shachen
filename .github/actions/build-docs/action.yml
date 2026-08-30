@@ -19,10 +19,15 @@ runs:
       shell: bash
       run: uv sync --locked --group docs --no-default-groups
 
-    # The exact set docs/Makefile documents. conf.py typesets with xelatex and
-    # asks for two font families that ship with TeX Live — DejaVu Sans Mono
-    # (fonts-extra) for the box-drawing glyphs and Fandol (lang-chinese) for
-    # the Chinese in the project name — so nothing else has to be installed.
+    # The set docs/Makefile documents, plus the fonts. Debian splits the font
+    # files out of the texlive packages and pulls them back in as *Recommends*,
+    # which --no-install-recommends drops — so anything the preamble names has
+    # to be listed here explicitly or xelatex stops with "the font ... cannot
+    # be found". FreeSerif/FreeSans/FreeMono is what Sphinx's own default
+    # fontpkg asks for; DejaVu Sans Mono covers the box-drawing glyphs of the
+    # pipeline diagram, and Fandol (in texlive-lang-chinese) the Chinese in the
+    # project name. Recommends stay off: the full list is ~40 font packages the
+    # docs never touch.
     - name: Install TeX Live
       shell: bash
       run: |
@@ -32,8 +37,11 @@ runs:
           latexmk \
           texlive-xetex \
           texlive-latex-extra \
+          texlive-fonts-recommended \
           texlive-fonts-extra \
-          texlive-lang-chinese
+          texlive-lang-chinese \
+          fonts-freefont-otf \
+          fonts-dejavu-core
 
     # A tag build documents exactly the version in pyproject.toml, so it is
     # labelled with that and nothing else. Any other build — the site deployed

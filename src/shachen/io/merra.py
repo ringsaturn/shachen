@@ -8,6 +8,7 @@ small TS-only netCDF cache, which the pipeline regrids onto the satellite grid.
 import datetime as dt
 from pathlib import Path
 
+import numpy as np
 import xarray as xr
 
 SHORT_NAME = "M2T1NXSLV"
@@ -83,22 +84,40 @@ def fetch_surface_meteorology(day: dt.date, out_dir: Path) -> Path:
     return cache
 
 
-def load_surface_meteorology(path: Path, when: dt.datetime) -> xr.Dataset:
-    """Load the met covariates linearly interpolated to ``when``.
+def _interp_to_time(dataset: xr.Dataset, when: dt.datetime) -> xr.Dataset:
+    """Linear interpolation in time, clamped to the file's own time axis.
 
-    Same half-past-the-hour time stamps as :func:`load_skin_temperature`.
+    MERRA-2 hourly means are stamped at half past the hour (00:30, 01:30,
+    ...), so a scan on the whole hour at either end of a day file — 00:00
+    UTC, say — falls *outside* that axis. Plain ``interp`` extrapolates to
+    NaN there, and a NaN skin temperature silently empties every field
+    downstream of the background and the cloud mask. Clamping reads the
+    nearest hourly mean instead (00:00 gets the 00:30 mean, half an hour
+    off), which is the same approximation the interpolation already makes
+    between stamps, and never invents a value the day never had.
+    """
+    stamp = np.datetime64(when.replace(tzinfo=None), "ns")
+    times = dataset["time"].values
+    return dataset.interp(time=min(max(stamp, times.min()), times.max()))
+
+
+def load_surface_meteorology(path: Path, when: dt.datetime) -> xr.Dataset:
+    """Load the met covariates interpolated to ``when``.
+
+    Same half-past-the-hour time stamps, and the same clamping at the ends
+    of the day, as :func:`load_skin_temperature`.
     """
     with xr.open_dataset(path) as ds:
-        return ds.interp(time=when.replace(tzinfo=None)).load()
+        return _interp_to_time(ds, when).load()
 
 
 def load_skin_temperature(path: Path, when: dt.datetime) -> xr.DataArray:
-    """Load TS (K) linearly interpolated to ``when`` on the MERRA-2 grid.
+    """Load TS (K) interpolated to ``when`` on the MERRA-2 grid.
 
-    MERRA-2 hourly means are stamped at half past the hour (00:30, 01:30,
-    ...); xarray's time interp handles that directly.
+    Linear in time between the half-past-the-hour stamps, clamped to the
+    file's first and last hourly mean — see :func:`_interp_to_time`.
     """
     with xr.open_dataset(path) as ds:
-        ts = ds["TS"].interp(time=when.replace(tzinfo=None)).load()
+        ts = _interp_to_time(ds[["TS"]], when).load()["TS"]
     ts.attrs["units"] = "K"
     return ts

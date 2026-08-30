@@ -363,3 +363,77 @@ def test_mongolia_end_to_end(tmp_path):
     red, blu = rgb[..., 0], rgb[..., 2]
     core_rgb = core & np.isfinite(red) & np.isfinite(blu)
     assert (red[core_rgb] - blu[core_rgb]).mean() > 0.05  # yellow dust
+
+
+def test_ahi_segments_for_bbox_picks_the_northern_strips():
+    """The north-China dust domain lives in the top three strips of the disk."""
+    assert fetch_case.ahi_segments_for_bbox((80.0, 30.0, 135.0, 55.0)) == (1, 2, 3)
+
+
+def test_ahi_segments_for_bbox_follows_the_disk_south():
+    """Strip numbers run north to south, and None means the whole disk."""
+    assert fetch_case.ahi_segments_for_bbox((130.0, -5.0, 150.0, 5.0)) == (5, 6)
+    assert fetch_case.ahi_segments_for_bbox((110.0, -40.0, 155.0, -10.0)) == (6, 7, 8, 9)
+    assert fetch_case.ahi_segments_for_bbox(None) == tuple(range(1, fetch_case.AHI_SEGMENTS + 1))
+
+
+@pytest.mark.parametrize(
+    "bbox",
+    [
+        (80.0, 30.0, 135.0, 55.0),  # the north-China dust domain
+        (138.0, 30.0, 143.0, 55.0),  # the same latitudes under the satellite
+        (130.0, -5.0, 150.0, 5.0),  # across the equator
+        (110.0, -40.0, 155.0, -10.0),  # southern hemisphere
+        (120.0, 20.0, 125.0, 25.0),  # small, mid-disk
+    ],
+)
+def test_ahi_segments_for_bbox_covers_the_domain(bbox):
+    """Whatever strips come back must span the domain's projected y range.
+
+    Computed here from the projection rather than from latitude, which is the
+    property that matters: a strip short at either end silently truncates the
+    crop, and no test of specific strip numbers would catch it everywhere.
+    """
+    from pyproj import CRS, Transformer
+
+    transformer = Transformer.from_crs(
+        CRS.from_epsg(4326), CRS.from_dict(fetch_case.AHI_PROJ), always_xy=True
+    )
+    lon_min, lat_min, lon_max, lat_max = bbox
+    ys = [
+        transformer.transform(lon, lat)[1]
+        for lon in np.linspace(lon_min, lon_max, 25)
+        for lat in (lat_min, lat_max)
+    ]
+
+    segments = fetch_case.ahi_segments_for_bbox(bbox)
+    strip = 2 * fetch_case.AHI_FLDK_Y_EXTENT / fetch_case.AHI_SEGMENTS
+    top = fetch_case.AHI_FLDK_Y_EXTENT - (segments[0] - 1) * strip
+    bottom = fetch_case.AHI_FLDK_Y_EXTENT - segments[-1] * strip
+    assert bottom <= min(ys) and max(ys) <= top
+    assert list(segments) == list(range(segments[0], segments[-1] + 1))  # contiguous
+
+
+def test_select_ahi_keys_keeps_only_the_requested_segments():
+    names = tuple(f"HS_H08_20210315_0400_B13_FLDK_R20_S{k:02d}10.DAT.bz2" for k in range(1, 11))
+    selected = fetch_case.select_ahi_keys(_listing(names), channels=("B13",), segments=(1, 2, 3))
+    assert [Path(k).name[-14:-8] for k in selected] == ["_S0110", "_S0210", "_S0310"]
+
+
+def test_select_ahi_keys_never_drops_a_whole_disk_file():
+    """``_S0101`` is one file for the entire disk, not the northern strip.
+
+    The early-years AWS repackaging ships a timeline that way; filtering it
+    down to the northern strips would silently discard the whole scene.
+    """
+    names = ("HS_H08_20160421_0800_B13_FLDK_R20_S0101.DAT.bz2",)
+    selected = fetch_case.select_ahi_keys(_listing(names), channels=("B13",), segments=(1, 2, 3))
+    assert selected == _listing(names)
+    southern = fetch_case.select_ahi_keys(_listing(names), channels=("B13",), segments=(7, 8))
+    assert southern == _listing(names)
+
+
+def test_select_ahi_keys_raises_when_the_segments_hold_nothing():
+    names = tuple(f"HS_H08_20210315_0400_B13_FLDK_R20_S{k:02d}10.DAT.bz2" for k in range(7, 11))
+    with pytest.raises(RuntimeError, match="B13"):
+        fetch_case.select_ahi_keys(_listing(names), channels=("B13",), segments=(1, 2))

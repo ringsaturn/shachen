@@ -117,8 +117,91 @@ def ahi_timeline_prefix(case: Case) -> str:
 
 _AHI_RESOLUTION_RE = re.compile(r"_R(\d{2})_")
 
+#: ``_S{segment:02d}{total:02d}`` in an HSD basename: which strip of how many.
+#: The field ends the stem, so it is followed by the extension, not by "_".
+_AHI_SEGMENT_RE = re.compile(r"_S(\d{2})(\d{2})(?=[._])")
 
-def select_ahi_keys(keys: list[str], channels: tuple[str, ...] = AHI_CHANNELS) -> list[str]:
+#: A full-disk HSD timeline is cut into 10 strips, S01 northernmost, each a
+#: tenth of the 2-km fixed grid's 5500 lines (+-5,500,000 m in y).
+AHI_SEGMENTS = 10
+AHI_FLDK_Y_EXTENT = 5_500_000.0
+
+#: The AHI fixed grid's projection (Himawari-8/9 parked at 140.7E).
+AHI_PROJ = {
+    "proj": "geos",
+    "h": 35785863.0,
+    "lon_0": 140.7,
+    "sweep": "y",
+    "a": 6378137.0,
+    "rf": 298.257024882273,
+}
+
+#: Slop added to a domain's projected extent before it is turned into strip
+#: numbers, so an ellipsoid or pixel-center difference can never truncate the
+#: crop. One strip is 1,100,000 m, so this is cheap insurance.
+_SEGMENT_MARGIN_M = 20_000.0
+
+
+def ahi_segments_for_bbox(bbox: tuple[float, float, float, float] | None) -> tuple[int, ...]:
+    """The 1-based HSD strip numbers whose data covers ``bbox`` (None -> all).
+
+    A full disk arrives as 10 north-to-south strips, and a regional domain
+    needs only a few: the north-China dust domain lives in S01-S03, so
+    fetching all ten downloads about four times what the crop keeps.
+
+    The domain's boundary is projected onto the fixed grid rather than read
+    off latitude alone — in a geostationary projection y depends on longitude
+    too, so a domain's northernmost *projected* point need not sit at its
+    northernmost corner.
+    """
+    if bbox is None:
+        return tuple(range(1, AHI_SEGMENTS + 1))
+    from pyproj import CRS, Transformer
+
+    lon_min, lat_min, lon_max, lat_max = bbox
+    steps = 100
+    lons = [lon_min + (lon_max - lon_min) * i / steps for i in range(steps + 1)]
+    lats = [lat_min + (lat_max - lat_min) * i / steps for i in range(steps + 1)]
+    boundary = (
+        [(lon, lat_min) for lon in lons]
+        + [(lon, lat_max) for lon in lons]
+        + [(lon_min, lat) for lat in lats]
+        + [(lon_max, lat) for lat in lats]
+    )
+    transformer = Transformer.from_crs(CRS.from_epsg(4326), CRS.from_dict(AHI_PROJ), always_xy=True)
+    ys = [
+        y
+        for _, y in (transformer.transform(lon, lat) for lon, lat in boundary)
+        if abs(y) != float("inf") and y == y
+    ]
+    if not ys:
+        raise RuntimeError(f"bbox {bbox} does not intersect the AHI disk")
+
+    strip = 2 * AHI_FLDK_Y_EXTENT / AHI_SEGMENTS
+    first = int((AHI_FLDK_Y_EXTENT - (max(ys) + _SEGMENT_MARGIN_M)) // strip) + 1
+    last = int((AHI_FLDK_Y_EXTENT - (min(ys) - _SEGMENT_MARGIN_M)) // strip) + 1
+    return tuple(range(max(1, first), min(AHI_SEGMENTS, last) + 1))
+
+
+def _in_segments(key: str, segments: tuple[int, ...]) -> bool:
+    """Whether an HSD key belongs to ``segments`` — single-file disks always do.
+
+    ``_S0110_`` is strip 1 of 10; ``_S0101_`` is the whole disk in one file
+    (the early-years AWS repackaging). Only a genuinely segmented timeline is
+    filtered, so restricting strips can never drop a whole-disk file.
+    """
+    match = _AHI_SEGMENT_RE.search(Path(key).name)
+    if match is None:
+        return True
+    segment, total = int(match.group(1)), int(match.group(2))
+    return total <= 1 or segment in segments
+
+
+def select_ahi_keys(
+    keys: list[str],
+    channels: tuple[str, ...] = AHI_CHANNELS,
+    segments: tuple[int, ...] | None = None,
+) -> list[str]:
     """Pick each channel's HSD keys for ``channels`` from a timeline listing.
 
     For each channel, in order: every key containing ``_{chan}_`` and
@@ -128,10 +211,17 @@ def select_ahi_keys(keys: list[str], channels: tuple[str, ...] = AHI_CHANNELS) -
     so with no R20 match the coarsest resolution present for that channel is
     taken instead (load_scene's native resample aggregates it onto the 2-km
     grid). A channel with no keys at all raises RuntimeError naming it.
+
+    ``segments`` (from :func:`ahi_segments_for_bbox`) keeps only the strips a
+    regional domain needs; None keeps the whole disk. A channel whose keys are
+    all outside the requested strips still raises RuntimeError — a domain the
+    timeline does not cover is a mistake worth hearing about.
     """
     selected: list[str] = []
     for chan in channels:
         candidates = [k for k in keys if f"_{chan}_" in k]
+        if segments is not None:
+            candidates = [k for k in candidates if _in_segments(k, segments)]
         matches = sorted(k for k in candidates if "_R20_" in k)
         if not matches and candidates:
             coarsest = max(
@@ -163,7 +253,12 @@ def ahi_local_name(key: str) -> str:
     return name
 
 
-def fetch_ahi(case: Case, out_dir: Path, channels: tuple[str, ...] = AHI_CHANNELS) -> list[Path]:
+def fetch_ahi(
+    case: Case,
+    out_dir: Path,
+    channels: tuple[str, ...] = AHI_CHANNELS,
+    segments: tuple[int, ...] | None = None,
+) -> list[Path]:
     """Download ``channels`` (2-km R20 files) of ``case``'s timeline.
 
     Lists :func:`ahi_timeline_prefix` (missing/empty prefix -> RuntimeError
@@ -173,6 +268,13 @@ def fetch_ahi(case: Case, out_dir: Path, channels: tuple[str, ...] = AHI_CHANNEL
     Each key lands under :func:`ahi_local_name` — B03 is decompressed on
     arrival (stdlib bz2, the compressed download removed) and the
     exists-check runs against that final name, so re-runs stay idempotent.
+
+    ``segments`` defaults to the strips ``case.bbox`` needs
+    (:func:`ahi_segments_for_bbox`), which is what the crop keeps anyway —
+    a quarter of the bytes for a regional domain. Pass a tuple to override,
+    or ``range(1, AHI_SEGMENTS + 1)`` for the whole disk. **The cache
+    directory therefore holds one bbox's strips**: widening a domain later
+    means refetching, since the exists-check cannot know what is missing.
     """
     import bz2
 
@@ -187,9 +289,11 @@ def fetch_ahi(case: Case, out_dir: Path, channels: tuple[str, ...] = AHI_CHANNEL
     if not keys:
         raise RuntimeError(f"Nothing under s3://{prefix}")
 
+    if segments is None:
+        segments = ahi_segments_for_bbox(case.bbox)
     out_dir.mkdir(parents=True, exist_ok=True)
     local: list[Path] = []
-    for key in select_ahi_keys(keys, channels):
+    for key in select_ahi_keys(keys, channels, segments):
         chan = Path(key).name.split("_")[4]
         dest = out_dir / ahi_local_name(key)
         if not dest.exists():

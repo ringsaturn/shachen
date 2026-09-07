@@ -11,6 +11,8 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 
+from shachen.io.staging import staged_download
+
 SHORT_NAME = "M2T1NXSLV"
 
 #: Single-level variables the dust-PM10 matchup keeps from M2T1NXSLV.
@@ -23,32 +25,19 @@ SURFACE_MET_FLX_VARS = ("PBLH",)
 
 def fetch_skin_temperature(day: dt.date, out_dir: Path) -> Path:
     """Download MERRA-2 TS for ``day``; return path to a TS-only netCDF."""
-    out_dir.mkdir(parents=True, exist_ok=True)
     cache = out_dir / f"merra2_ts_{day:%Y%m%d}.nc"
     if cache.exists():
         return cache
 
-    import earthaccess
-
-    earthaccess.login(strategy="netrc")
-    results = earthaccess.search_data(
-        short_name=SHORT_NAME,
-        temporal=(day.isoformat(), day.isoformat()),
-    )
-    if not results:
-        raise RuntimeError(f"No {SHORT_NAME} granule found for {day}")
-    paths = earthaccess.download(results[:1], str(out_dir))
-    full = Path(paths[0])
-    with xr.open_dataset(full) as ds:
-        ds[["TS"]].to_netcdf(cache)
-    full.unlink()  # keep only the small TS cache
+    with staged_download(cache) as (scratch, staged):
+        full = _download_granule(SHORT_NAME, day, scratch)
+        with xr.open_dataset(full) as ds:
+            ds[["TS"]].to_netcdf(staged)  # keep only the small TS cache
     return cache
 
 
-def _download_stripped(
-    short_name: str, day: dt.date, variables: tuple[str, ...], out_dir: Path
-) -> xr.Dataset:
-    """Download one MERRA-2 day granule and return only ``variables``."""
+def _download_granule(short_name: str, day: dt.date, out_dir: Path) -> Path:
+    """Download one MERRA-2 day granule into ``out_dir``."""
     import earthaccess
 
     earthaccess.login(strategy="netrc")
@@ -58,12 +47,16 @@ def _download_stripped(
     )
     if not results:
         raise RuntimeError(f"No {short_name} granule found for {day}")
-    paths = earthaccess.download(results[:1], str(out_dir))
-    full = Path(paths[0])
+    return Path(earthaccess.download(results[:1], str(out_dir))[0])
+
+
+def _download_stripped(
+    short_name: str, day: dt.date, variables: tuple[str, ...], out_dir: Path
+) -> xr.Dataset:
+    """Download one MERRA-2 day granule and return only ``variables``."""
+    full = _download_granule(short_name, day, out_dir)
     with xr.open_dataset(full) as ds:
-        stripped = ds[list(variables)].load()
-    full.unlink()  # keep only the small stripped cache
-    return stripped
+        return ds[list(variables)].load()
 
 
 def fetch_surface_meteorology(day: dt.date, out_dir: Path) -> Path:
@@ -73,14 +66,14 @@ def fetch_surface_meteorology(day: dt.date, out_dir: Path) -> Path:
     M2T1NXSLV with ``SURFACE_MET_FLX_VARS`` (PBLH) from M2T1NXFLX, both
     hourly on the native 0.5 x 0.625 degree grid.
     """
-    out_dir.mkdir(parents=True, exist_ok=True)
     cache = out_dir / f"merra2_met_{day:%Y%m%d}.nc"
     if cache.exists():
         return cache
 
-    slv = _download_stripped(SHORT_NAME, day, SURFACE_MET_SLV_VARS, out_dir)
-    flx = _download_stripped(FLX_SHORT_NAME, day, SURFACE_MET_FLX_VARS, out_dir)
-    xr.merge([slv, flx]).to_netcdf(cache)
+    with staged_download(cache) as (scratch, staged):
+        slv = _download_stripped(SHORT_NAME, day, SURFACE_MET_SLV_VARS, scratch)
+        flx = _download_stripped(FLX_SHORT_NAME, day, SURFACE_MET_FLX_VARS, scratch)
+        xr.merge([slv, flx]).to_netcdf(staged)
     return cache
 
 

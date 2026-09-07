@@ -16,6 +16,7 @@ import numpy as np
 import xarray as xr
 
 from shachen.constants import BAND_CENTER_UM, Band
+from shachen.io.staging import staged_download
 
 SHORT_NAME = "CAM5K30EM"  # CAMEL monthly 0.05-deg emissivity
 
@@ -25,8 +26,11 @@ EMISSIVE_BANDS = (Band.SWIR_39, Band.WV_62, Band.TIR_86, Band.TIR_104, Band.TIR_
 
 def fetch_emissivity(month: dt.date, out_dir: Path) -> Path:
     """Download the CAMEL monthly emissivity file covering ``month``."""
-    out_dir.mkdir(parents=True, exist_ok=True)
     first = month.replace(day=1)
+    canonical = out_dir / f"{SHORT_NAME}_{first:%Y%m}.nc"
+    if canonical.exists():
+        return canonical
+    # A file left under its native name by an earlier version still counts.
     existing = sorted(out_dir.glob(f"CAM5K30EM*{first:%Y%m}*.nc"))
     if existing:
         return existing[0]
@@ -50,12 +54,12 @@ def fetch_emissivity(month: dt.date, out_dir: Path) -> Path:
             f"No {SHORT_NAME} granule matching {token} found "
             f"({len(results)} granules in the temporal window)"
         )
-    paths = earthaccess.download(matched[:1], str(out_dir))
-    path = Path(paths[0])
-    # Normalize the name so the cache glob above finds it next time.
-    canonical = out_dir / f"{SHORT_NAME}_{first:%Y%m}.nc"
-    if path != canonical:
-        path.rename(canonical)
+    # Download into a scratch directory and publish under the canonical name
+    # with one atomic rename: parallel callers ask for the same month, and a
+    # granule downloaded straight into out_dir is visible to the cache glob
+    # above while it is still being written.
+    with staged_download(canonical) as (scratch, staged):
+        Path(earthaccess.download(matched[:1], str(scratch))[0]).rename(staged)
     return canonical
 
 

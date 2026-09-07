@@ -10,6 +10,7 @@ interpolation is linear in wavelength, as the paper implies.
 
 import datetime as dt
 import re
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -24,43 +25,92 @@ SHORT_NAME = "CAM5K30EM"  # CAMEL monthly 0.05-deg emissivity
 EMISSIVE_BANDS = (Band.SWIR_39, Band.WV_62, Band.TIR_86, Band.TIR_104, Band.TIR_123)
 
 
-def fetch_emissivity(month: dt.date, out_dir: Path) -> Path:
-    """Download the CAMEL monthly emissivity file covering ``month``."""
+def fetch_emissivity(month: dt.date, out_dir: Path, fallback_years: int = 8) -> Path:
+    """Download the CAMEL monthly emissivity file covering ``month``.
+
+    CAM5K30EM V003 stops at 2023-12, so a scene after that has no emissivity
+    file of its own. Rather than fail, fall back to the same calendar month
+    of the most recent year that does have one, up to ``fallback_years`` back,
+    and warn which file was used.
+
+    The substitution is smaller than it looks. What the paper actually uses
+    is the UWBF monthly *climatology*, which carries no year at all: land
+    emissivity in the thermal window is set by land cover and its seasonal
+    cycle, and April over the Gobi looks much the same from one year to the
+    next. Reading April 2023 for an April 2025 scene is the same kind of
+    approximation the paper makes on purpose -- what would not be acceptable
+    is reading a different *month*, which is why the search only ever walks
+    back in whole years.
+    """
     first = month.replace(day=1)
+    cached = _cached_month(first, out_dir)
+    if cached is not None:
+        return cached
+
+    import earthaccess
+
+    earthaccess.login(strategy="netrc")
+    for years_back in range(fallback_years + 1):
+        wanted = first.replace(year=first.year - years_back)
+        cached = _cached_month(wanted, out_dir) if years_back else None
+        if cached is not None:
+            _warn_substitute(first, wanted)
+            return cached
+        matched = _search_month(wanted)
+        if not matched:
+            continue
+        if years_back:
+            _warn_substitute(first, wanted)
+        canonical = out_dir / f"{SHORT_NAME}_{wanted:%Y%m}.nc"
+        # Download into a scratch directory and publish under the canonical
+        # name with one atomic rename: parallel callers ask for the same
+        # month, and a granule downloaded straight into out_dir is visible to
+        # the cache glob above while it is still being written.
+        with staged_download(canonical) as (scratch, staged):
+            Path(earthaccess.download(matched[:1], str(scratch))[0]).rename(staged)
+        return canonical
+
+    raise RuntimeError(
+        f"No {SHORT_NAME} granule for {first:%Y-%m} or the same month of the "
+        f"{fallback_years} years before it"
+    )
+
+
+def _cached_month(first: dt.date, out_dir: Path) -> Path | None:
+    """The already-downloaded file for a month, under either name."""
     canonical = out_dir / f"{SHORT_NAME}_{first:%Y%m}.nc"
     if canonical.exists():
         return canonical
     # A file left under its native name by an earlier version still counts.
     existing = sorted(out_dir.glob(f"CAM5K30EM*{first:%Y%m}*.nc"))
-    if existing:
-        return existing[0]
+    return existing[0] if existing else None
 
+
+def _search_month(first: dt.date):
+    """CAMEL granules whose own filename carries this month's YYYYMM token.
+
+    Search the whole month, then filter by the token: a point-in-time
+    temporal search can match the *previous* month's granule, whose coverage
+    interval ends on the 1st (seen with 2017-03: the Feb file spans Feb 1 -
+    Mar 1).
+    """
     import earthaccess
 
-    earthaccess.login(strategy="netrc")
-    # Search the whole month, then pick the granule whose native filename
-    # carries this month's YYYYMM token: a point-in-time temporal search can
-    # match the *previous* month's granule, whose coverage interval ends on
-    # the 1st (seen with 2017-03: the Feb file spans Feb 1 - Mar 1).
     last = (first.replace(day=28) + dt.timedelta(days=4)).replace(day=1) - dt.timedelta(days=1)
     results = earthaccess.search_data(
         short_name=SHORT_NAME,
         temporal=(first.isoformat(), last.isoformat()),
     )
     token = f"{first:%Y%m}"
-    matched = [g for g in results if token in " ".join(g.data_links())]
-    if not matched:
-        raise RuntimeError(
-            f"No {SHORT_NAME} granule matching {token} found "
-            f"({len(results)} granules in the temporal window)"
-        )
-    # Download into a scratch directory and publish under the canonical name
-    # with one atomic rename: parallel callers ask for the same month, and a
-    # granule downloaded straight into out_dir is visible to the cache glob
-    # above while it is still being written.
-    with staged_download(canonical) as (scratch, staged):
-        Path(earthaccess.download(matched[:1], str(scratch))[0]).rename(staged)
-    return canonical
+    return [g for g in results if token in " ".join(g.data_links())]
+
+
+def _warn_substitute(wanted: dt.date, used: dt.date) -> None:
+    warnings.warn(
+        f"{SHORT_NAME} has no {wanted:%Y-%m} granule; using {used:%Y-%m} "
+        f"emissivity for the same calendar month",
+        stacklevel=3,
+    )
 
 
 def _find_emissivity_cube(ds: xr.Dataset) -> tuple[xr.DataArray, np.ndarray, str]:

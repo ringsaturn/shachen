@@ -53,6 +53,46 @@ and `depth` = 50 K. The prose is explicit that "observations that are
 relatively cold compared to MERRA produce high value for DT3", which the
 printed equation does not do.
 
+### Eq. 19 (CF normalization) — one interval per branch
+
+```
+CF_day = N(CF*_day; cf_norm_day)                      # 0.25–2.50 as printed
+CF_ngt = N(CF*_ngt; cf_norm_ngt)                      # 0.125–1.25
+CF_trm = N(CF*_trm; interpolated on B_ngt_trm)
+```
+
+As printed, Eq. 19 normalizes all three confidence factors with the single
+interval (0.25, 2.50), but Eqs. 16–18 do not put them on one scale. Each DT
+term saturates at 1, so the daytime sum `DT1 + DT2 + DT3` reaches 3.0 while
+the night sum `max(DT1, DT2) + ½·DT3` reaches only 1.5 — night has no
+independent second test, because without solar heating the 8.6 µm emissivity
+contrast stops being independent of the split window. One shared interval
+therefore caps `CF_ngt` at (1.5 − 0.25)/(2.50 − 0.25) = **0.556**, against
+1.0 for `CF_day`.
+
+The effect is not a threshold artefact, it is the whole night side of the
+product: on a Himawari AHI event (2021-03-15/16 north China) the same dust
+that reads `CF_day` ≈ 0.50 by day reads `CF_ngt` ≈ 0.07 after dark. The two
+branches agree on **where** the dust is (r = 0.58) and disagree on how much.
+Eq. 22 blends across the terminator on cos θ, so there is no step to notice —
+the dust simply appears to dissipate overnight.
+
+The fix is one interval per branch, scaled by the ratio of the raw ceilings
+(`constants.NIGHT_CF_SCALE` = 0.5). The floor scales with the ceiling for the
+same reason: DT3's clear-sky bias enters Eq. 18 at half the weight it has in
+Eq. 16. `CF_trm`, whose ceiling (2.5) sits between the two, normalizes with
+the interval interpolated on Eq. 20's `B_ngt_trm` — the day interval where
+Eq. 22 hands it to `CF_day`, the night interval where it hands it to
+`CF_ngt`, so no new discontinuity is introduced. `CF_trm` is the one branch
+whose ceiling is not matched exactly (0.833 of the day interval at
+θ ≤ 90°); it is bounded and it is smoothed by the same cos-zenith blend.
+
+`ConfidenceConstants(cf_norm=...)` still accepts one interval and applies it
+to both branches, which reproduces the printed behaviour exactly. It is an
+`InitVar`, so it reads back as `None` rather than as an interval: code that
+did `constants.cf_norm.min` raises instead of quietly normalizing with the
+wrong bounds. Read `cf_norm_day` / `cf_norm_ngt` instead.
+
 ## 3. Ancillary data substitution
 
 **Surface emissivity: CAMEL in place of UWBF.** The paper specifies the

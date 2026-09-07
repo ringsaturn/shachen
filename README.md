@@ -119,17 +119,34 @@ python scripts/run_case.py   2017-03-23-swus   # → netCDF + PNG
 
 ## Deviations from the paper
 
-Three printed equations are inconsistent with the paper's own prose and figures
-even after the erratum, and are implemented per the prose:
+Four printed equations are inconsistent with the paper's own prose, figures or
+internal scales even after the erratum, and are implemented per the prose:
 
 | Equation | Deviation |
 |---|---|
 | Eq. 4 (CM2) | Magnitude reversed: as printed it saturates the cloud mask over clear sky |
 | Eq. 11 (CM_day) | Uses CM3, where the print run has CM4 (the 3.9 µm test is night-only) |
 | Eq. 15 (DT3) | Magnitude reversed: the printed form contradicts the stated intent |
+| Eq. 19 (CF norm) | One normalization interval per branch: Eqs. 16 and 18 peak at 3.0 and 1.5, so the printed single interval caps `cf_ngt` at 0.556 and dust fades at dusk |
 
 Plus one substitution (CAMEL emissivity for the registration-walled UWBF) and
 one opt-in per-sensor retune.
+
+### Upgrading to 0.3.0
+
+The Eq. 19 split changes `cf_ngt`, and through it `cf_comb` at night, for
+every caller — night confidences roughly double. `ConfidenceConstants` now
+takes `cf_norm_day` and `cf_norm_ngt` in place of `cf_norm`; passing
+`cf_norm=` still works and sets both to that one interval, which reproduces
+0.2.x exactly:
+
+```python
+ConfidenceConstants(cf_norm=Bounds(0.25, 2.50))   # pre-0.3 behaviour
+```
+
+Reading `constants.confidence.cf_norm` back now yields `None` (it is an
+`InitVar`), so `cf_norm.min` raises rather than silently normalizing with
+the wrong bounds. Read `cf_norm_day` / `cf_norm_ngt`.
 
 All of it, with the reasoning and the numbers, is in
 [`docs/deviations.md`](docs/deviations.md). Read that before changing any of

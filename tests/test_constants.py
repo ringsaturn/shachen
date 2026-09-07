@@ -18,7 +18,10 @@ from shachen.constants import (
     DUST_RGB,
     DUST_RGB_ABI,
     DUST_RGB_BY_READER,
+    NIGHT_CF_SCALE,
     Band,
+    Bounds,
+    ConfidenceConstants,
 )
 
 
@@ -77,12 +80,23 @@ class TestConfidenceBounds:
         assert DEFAULTS.confidence.dt3_weight_trm == 0.5
         assert DEFAULTS.confidence.dt3_weight_ngt == 0.5
 
-    def test_cf_norm(self):
-        # Eq. 19: N(CF; 0.25, 2.50)
-        assert (DEFAULTS.confidence.cf_norm.min, DEFAULTS.confidence.cf_norm.max) == (
-            0.25,
-            2.50,
-        )
+    def test_cf_norm_day(self):
+        # Eq. 19 as printed: N(CF; 0.25, 2.50), kept for the day branch.
+        day = DEFAULTS.confidence.cf_norm_day
+        assert (day.min, day.max) == (0.25, 2.50)
+
+    def test_cf_norm_ngt_is_the_day_interval_halved(self):
+        # Eq. 18's raw ceiling is half Eq. 16's, so its interval is too.
+        day = DEFAULTS.confidence.cf_norm_day
+        ngt = DEFAULTS.confidence.cf_norm_ngt
+        assert NIGHT_CF_SCALE == 0.5
+        assert (ngt.min, ngt.max) == (day.min * NIGHT_CF_SCALE, day.max * NIGHT_CF_SCALE)
+
+    def test_cf_norm_alias_sets_both(self):
+        # Deprecated constructor alias == the pre-split single interval.
+        legacy = ConfidenceConstants(cf_norm=Bounds(0.25, 2.50))
+        assert legacy.cf_norm_day == legacy.cf_norm_ngt == Bounds(0.25, 2.50)
+        assert legacy.cf_norm is None  # InitVar: write-only, never an interval
 
     def test_terminator_blend(self):
         # Eqs. 20-21: exponent 1.5; night/trm (105 deg, 90 deg); trm/day (90 deg, 75 deg)
@@ -109,9 +123,18 @@ class TestImageryBounds:
 
 class TestAbiTuned:
     def test_single_deviation_is_cf_norm_floor(self):
-        # ABI retune: only the Eq. 19 lower bound moves, 0.25 -> 0.40.
-        t = ABI_TUNED.confidence.cf_norm
+        # ABI retune: only the Eq. 19 lower bound moves, 0.25 -> 0.40, and
+        # the night interval follows it through NIGHT_CF_SCALE.
+        t = ABI_TUNED.confidence.cf_norm_day
         assert (t.min, t.max) == (0.40, 2.50)
+        n = ABI_TUNED.confidence.cf_norm_ngt
+        assert (n.min, n.max) == (0.20, 1.25)
+
+    def test_only_the_confidence_interval_differs(self):
+        paper = DEFAULTS.confidence
+        tuned = ABI_TUNED.confidence
+        for name in ("dt3_weight_trm", "dt3_weight_ngt", "blend_exponent"):
+            assert getattr(tuned, name) == getattr(paper, name)
 
     def test_everything_else_matches_paper(self):
         assert ABI_TUNED.cloud_mask == DEFAULTS.cloud_mask

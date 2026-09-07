@@ -1,17 +1,25 @@
 """DEBRA confidence factor, Eqs. 16-22 (Eqs. 21-22 per the 2020 erratum).
 
 Combines the dust tests under cloud-mask suppression into day / terminator /
-night confidence factors (Eqs. 16-18), normalizes each with the (0.25, 2.50)
-bounds (Eq. 19), and blends them across the terminator with solar-zenith
-weights ``B_ngt_trm`` and ``B_trm_day`` (Eqs. 20-21, exponent 1.5) into the
-final ``CF_comb`` in [0, 1] (Eq. 22).
+night confidence factors (Eqs. 16-18), normalizes each (Eq. 19), and blends
+them across the terminator with solar-zenith weights ``B_ngt_trm`` and
+``B_trm_day`` (Eqs. 20-21, exponent 1.5) into the final ``CF_comb`` in [0, 1]
+(Eq. 22).
+
+Eq. 19 as printed uses one interval, (0.25, 2.50), for all three branches.
+That is a scale error, and a visible one: Eq. 16 sums three DT terms and can
+reach 3.0, Eq. 18 sums two and can reach 1.5, so one shared interval caps
+CF_ngt at (1.5 - 0.25) / (2.50 - 0.25) = 0.556 while CF_day reaches 1. Dust
+appears to fade at dusk. The deviation here is to give each branch its own
+interval (:class:`shachen.constants.ConfidenceConstants`), with the
+terminator interpolating between them on the Eq. 20 weight.
 """
 
 import numpy as np
 import xarray as xr
 
 from shachen.constants import DEFAULTS, ConfidenceConstants
-from shachen.norm import normalize, normalize_cos_zenith
+from shachen.norm import normalize, normalize_cos_zenith, normalize_interp
 
 _TEST_VARS = ("dt1", "dt2", "dt3")
 _CLOUD_VARS = ("cm_norm_day", "cm_norm_ngt")
@@ -48,6 +56,13 @@ def confidence(
     ``cm_norm_ngt`` respectively, CF_ngt takes ``max(DT1, DT2)``), the blend
     weights ``b_ngt_trm``, ``b_trm_day`` (via
     :func:`shachen.norm.normalize_cos_zenith`), and ``cf_comb`` (Eq. 22).
+
+    The Eq. 19 intervals are per branch: ``constants.cf_norm_day`` for
+    CF_day, ``constants.cf_norm_ngt`` for CF_ngt, and for CF_trm the two
+    interpolated on ``b_ngt_trm``, so its scale matches whichever neighbour
+    Eq. 22 is blending it into. Passing ``cf_norm=`` to
+    :class:`shachen.constants.ConfidenceConstants` sets both intervals to one
+    value and restores the printed single-interval behaviour.
     """
     _require(tests, _TEST_VARS, "tests")
     _require(cloud, _CLOUD_VARS, "cloud")
@@ -78,14 +93,17 @@ def confidence(
     # Eq. 18: night confidence, max(DT1, DT2), nighttime cloud mask.
     cf_ngt_raw = (np.maximum(dt1, dt2) + c.dt3_weight_ngt * dt3) * (1.0 - cm_ngt)
 
-    # Eq. 19: normalize each variant onto [0, 1].
-    cf_day = normalize(cf_day_raw, c.cf_norm)
-    cf_trm = normalize(cf_trm_raw, c.cf_norm)
-    cf_ngt = normalize(cf_ngt_raw, c.cf_norm)
-
     # Eqs. 20-21 (21 per the 2020 erratum): cos-zenith blend weights.
     b_ngt_trm = normalize_cos_zenith(zenith_deg, c.ngt_trm_zenith_deg, c.blend_exponent)
     b_trm_day = normalize_cos_zenith(zenith_deg, c.trm_day_zenith_deg, c.blend_exponent)
+
+    # Eq. 19: normalize each variant onto [0, 1]. Day and night use their own
+    # intervals because Eqs. 16 and 18 have different raw ceilings (3.0 and
+    # 1.5); the terminator, whose ceiling is between them, rides the Eq. 20
+    # weight from one interval to the other.
+    cf_day = normalize(cf_day_raw, c.cf_norm_day)
+    cf_trm = normalize_interp(cf_trm_raw, c.cf_norm_day, c.cf_norm_ngt, b_ngt_trm)
+    cf_ngt = normalize(cf_ngt_raw, c.cf_norm_ngt)
 
     # Eq. 22 (erratum): nested day / terminator / night blend.
     cf_comb = b_trm_day * cf_day + (1.0 - b_trm_day) * (

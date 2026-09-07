@@ -12,7 +12,7 @@ The sensor facts here (:class:`Band` and the channel maps) are not from the
 paper; they are what each instrument calls the roles the algorithms read.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from enum import StrEnum
 
 
@@ -118,21 +118,64 @@ class DustTestConstants:
     dt3_depth_k: float = 50.0
 
 
+#: Ratio of the Eq. 18 night ceiling to the Eq. 16 day ceiling. Both are sums
+#: of DT terms that each saturate at 1: day is DT1 + DT2 + DT3 = 3.0, night is
+#: max(DT1, DT2) + dt3_weight_ngt * DT3 = 1.5 -- night has no independent
+#: second test, because without solar heating the 8.6 um emissivity contrast
+#: stops being independent of the split window. One shared Eq. 19 interval
+#: therefore squeezes CF_ngt onto the lower half of [0, 1]; scaling the night
+#: interval by this factor puts the two branches back on one scale. The floor
+#: scales with it for the same reason: DT3's clear-sky bias enters Eq. 18 at
+#: half the weight it has in Eq. 16.
+NIGHT_CF_SCALE: float = 0.5
+
+
+def _scaled(bounds: Bounds, factor: float = NIGHT_CF_SCALE) -> Bounds:
+    """``bounds`` with both ends multiplied by ``factor``."""
+    return Bounds(bounds.min * factor, bounds.max * factor)
+
+
 @dataclass(frozen=True)
 class ConfidenceConstants:
-    """Eqs. 16-22 (Eqs. 21-22 per erratum)."""
+    """Eqs. 16-22 (Eqs. 21-22 per erratum).
+
+    Eq. 19 is normalization with one interval, but Eqs. 16 and 18 do not
+    produce values on one scale (see :data:`NIGHT_CF_SCALE`), so the interval
+    is split here: ``cf_norm_day`` normalizes CF_day, ``cf_norm_ngt``
+    normalizes CF_ngt, and the terminator branch interpolates between them on
+    the Eq. 20 weight, which is 1 on the day side of 90 deg and 0 beyond
+    105 deg -- so CF_trm meets whichever neighbour Eq. 22 is handing it to.
+
+    ``cf_norm`` is accepted as a constructor-only alias that sets *both*
+    intervals to the value given, which is the pre-split behaviour exactly.
+    It is an InitVar, so it reads back as ``None``, never as an interval:
+    code that used to do ``constants.cf_norm.min`` raises instead of quietly
+    normalizing with the wrong bounds. Read ``cf_norm_day`` / ``cf_norm_ngt``.
+    (It stays a declared field, rather than being deleted off the class, so
+    that :func:`dataclasses.replace` keeps working on this dataclass.)
+    """
 
     #: Eq. 17: CF_trm weights DT3 by this factor; Eq. 18: CF_ngt likewise.
     dt3_weight_trm: float = 0.5
     dt3_weight_ngt: float = 0.5
-    #: Eq. 19: each CF variant normalized with these bounds.
-    cf_norm: Bounds = field(default_factory=lambda: Bounds(0.25, 2.50))
+    #: Eq. 19 for CF_day: the paper's printed interval.
+    cf_norm_day: Bounds = field(default_factory=lambda: Bounds(0.25, 2.50))
+    #: Eq. 19 for CF_ngt: the same interval scaled by :data:`NIGHT_CF_SCALE`.
+    cf_norm_ngt: Bounds = field(default_factory=lambda: Bounds(0.125, 1.25))
     #: Eqs. 20-21: terminator blending on cos(theta_sun), exponent 1.5.
     blend_exponent: float = 1.5
     #: night/terminator interface: N(cos theta; cos 105 deg, cos 90 deg)
     ngt_trm_zenith_deg: Bounds = field(default_factory=lambda: Bounds(105.0, 90.0))
     #: terminator/day interface: N(cos theta; cos 90 deg, cos 75 deg)
     trm_day_zenith_deg: Bounds = field(default_factory=lambda: Bounds(90.0, 75.0))
+    #: Deprecated alias: sets cf_norm_day and cf_norm_ngt to the same interval
+    #: (the pre-0.3 single-interval behaviour). Constructor-only.
+    cf_norm: InitVar[Bounds | None] = None
+
+    def __post_init__(self, cf_norm: Bounds | None) -> None:
+        if cf_norm is not None:
+            object.__setattr__(self, "cf_norm_day", cf_norm)
+            object.__setattr__(self, "cf_norm_ngt", cf_norm)
 
 
 @dataclass(frozen=True)
@@ -244,7 +287,13 @@ DEFAULTS = DebraConstants()
 #: 0.40 removes 92% of the tinted area (SE-US box, fraction CF > 0.05:
 #: 0.37 -> 0.028) while the 2017-03-23 plume mean CF drops only 5%
 #: (0.476 -> 0.452) and the 2020-12-23 plume core stays distinct (p90 0.40).
-#: The paper itself anticipates "minor retuning" per sensor.
+#: The paper itself anticipates "minor retuning" per sensor. The night
+#: interval follows it through :data:`NIGHT_CF_SCALE` (0.20, 1.25): the same
+#: DT3 floor enters Eq. 18 at half the weight, so the floor that suppresses it
+#: halves too.
 ABI_TUNED = DebraConstants(
-    confidence=ConfidenceConstants(cf_norm=Bounds(0.40, 2.50)),
+    confidence=ConfidenceConstants(
+        cf_norm_day=Bounds(0.40, 2.50),
+        cf_norm_ngt=_scaled(Bounds(0.40, 2.50)),
+    ),
 )

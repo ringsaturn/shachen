@@ -173,9 +173,22 @@ stop being independent without solar heating.
 \mathrm{CF}^{*}_{\text{ngt}} &= \left(\max(\mathrm{DT1}, \mathrm{DT2})
   + \tfrac{1}{2}\mathrm{DT3}\right)
   \left(1 - \mathrm{CM}^{\text{ngt}}_{\text{norm}}\right) & &\text{(Eq. 18)} \\
-\mathrm{CF} &= N(\mathrm{CF}^{*};\; 0.25,\; 2.50) & &\text{(Eq. 19)}
+\mathrm{CF}_{\text{day}} &= N(\mathrm{CF}^{*}_{\text{day}};\; 0.25,\; 2.50)
+  & &\text{(Eq. 19)}^{\dagger} \\
+\mathrm{CF}_{\text{ngt}} &= N(\mathrm{CF}^{*}_{\text{ngt}};\; 0.125,\; 1.25)
+  & &\text{(Eq. 19)}^{\dagger} \\
+\mathrm{CF}_{\text{trm}} &= N\!\left(\mathrm{CF}^{*}_{\text{trm}};\;
+  B_{\text{ngt}}^{\text{trm}}\,(0.25,\,2.50)
+  + \left(1 - B_{\text{ngt}}^{\text{trm}}\right)(0.125,\,1.25)\right)
+  & &\text{(Eq. 19)}^{\dagger}
 \end{align*}
 ```
+
+$\dagger$ Eq. 19 is printed with one interval, $(0.25,\,2.50)$, for all three
+branches. It is split per branch here because Eqs. 16 and 18 have different
+raw ceilings (3.0 and 1.5), which otherwise caps $\mathrm{CF}_{\text{ngt}}$ at
+0.556 — see [Deviations](deviations.md). Pass
+`ConfidenceConstants(cf_norm=Bounds(0.25, 2.50))` to restore the printed form.
 
 The terminator is crossed smoothly, with weights evaluated in cosine-zenith
 space:

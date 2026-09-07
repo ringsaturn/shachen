@@ -126,6 +126,21 @@ Eq. 19 lower bound from 0.25 to 0.40 to suppress a clear-sky DT3 floor specific
 to the ABI + MERRA-2 + CAMEL stack. The reasoning and the numbers are in
 [Deviations](deviations.md).
 
+Eq. 19's interval is per branch: `cf_norm_day` and `cf_norm_ngt`, with the
+terminator interpolating between them. The night interval is the day one
+halved, because Eq. 18's raw sum peaks at 1.5 against Eq. 16's 3.0; with one
+shared interval `cf_ngt` could never exceed 0.556 and dust faded at dusk.
+Passing `cf_norm=` sets both at once and restores the printed single-interval
+behaviour:
+
+```python
+from shachen.constants import Bounds, ConfidenceConstants, DebraConstants
+
+published = DebraConstants(
+    confidence=ConfidenceConstants(cf_norm=Bounds(0.25, 2.50)),
+)
+```
+
 ## Enhanced imagery
 
 The confidence field is rendered in two steps (Eqs. 23–29): a day/night

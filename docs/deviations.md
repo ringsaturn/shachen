@@ -83,9 +83,27 @@ same reason: DT3's clear-sky bias enters Eq. 18 at half the weight it has in
 Eq. 16. `CF_trm`, whose ceiling (2.5) sits between the two, normalizes with
 the interval interpolated on Eq. 20's `B_ngt_trm` — the day interval where
 Eq. 22 hands it to `CF_day`, the night interval where it hands it to
-`CF_ngt`, so no new discontinuity is introduced. `CF_trm` is the one branch
-whose ceiling is not matched exactly (0.833 of the day interval at
-θ ≤ 90°); it is bounded and it is smoothed by the same cos-zenith blend.
+`CF_ngt`, so no new discontinuity is introduced.
+
+`CF_trm` is the one branch whose interval is not scaled to its own ceiling,
+and that is measurable. On the day side of 90° it rides the day interval,
+built for a sum that reaches 3.0, while Eq. 17 reaches only 2.5, so the same
+dust reads low by `½·f/(max − min)` for a signal at fraction `f` of ceiling;
+just past 90° the interval starts moving toward the night one and it reads
+high instead. Against 42 dust days of station data (hourly, all hours,
+Himawari AHI over East Asia) the mean `CF_comb` on dust stations dips to
+0.056–0.064 over 80–95°, against 0.110 at 70–75° and 0.09–0.12 after 105°.
+Giving `CF_trm` an interval of its own — the day interval times 2.5/3.0 —
+recovers a quarter to two fifths of that over 80–90° and next to nothing over
+90–95°, where the dip is the dust tests themselves weakening at the day/night
+transition rather than any normalization.
+
+`ConfidenceConstants.cf_norm_trm` is that hook. It is `None` by default, so
+the shipped behaviour is the interpolation described above; set it to an
+interval and `CF_trm` normalizes on that instead. The default is left alone
+because the residual is bounded, because the fix is worth a fraction of a
+notch rather than the notch, and because the evaluation behind those numbers
+is not part of this package.
 
 `ConfidenceConstants(cf_norm=...)` still accepts one interval and applies it
 to both branches, which reproduces the printed behaviour exactly. It is an

@@ -136,9 +136,9 @@ def confidence(
 def blend_confidence(cf_day, cf_trm, cf_ngt, b_ngt_trm, b_trm_day):
     """Eq. 22 (erratum): the nested day / terminator / night blend.
 
-    Split out so that anything normalizing the branches differently --
-    :mod:`shachen.calibration` does -- blends them the same way rather than
-    keeping a second copy of Eq. 22.
+    Split out so that anything normalizing the branches differently -- a
+    calibration layer built on top of this package, say -- blends them the
+    same way rather than keeping a second copy of Eq. 22.
     """
     return b_trm_day * cf_day + (1.0 - b_trm_day) * (
         b_ngt_trm * cf_trm + (1.0 - b_ngt_trm) * cf_ngt

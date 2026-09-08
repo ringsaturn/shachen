@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from shachen.confidence import confidence
+from shachen.confidence import confidence, confidence_norm, confidence_raw
 from shachen.constants import DEFAULTS, Bounds, ConfidenceConstants
 
 C = DEFAULTS.confidence
@@ -52,8 +52,13 @@ def _norm_ngt(raw):
     return _norm(raw, C.cf_norm_ngt)
 
 
-def _norm_trm(raw, weight):
-    """Eq. 19 with the interval interpolated between the two sets."""
+def _norm_trm(raw):
+    """Eq. 19 on the terminator's own interval (Eq. 17 ceiling 2.5)."""
+    return _norm(raw, C.cf_norm_trm)
+
+
+def _norm_interp(raw, weight):
+    """Eq. 19 with the interval interpolated -- the 0.3.0 terminator."""
     lower = weight * C.cf_norm_day.min + (1.0 - weight) * C.cf_norm_ngt.min
     upper = weight * C.cf_norm_day.max + (1.0 - weight) * C.cf_norm_ngt.max
     return np.clip((raw - lower) / (upper - lower), 0.0, 1.0)
@@ -95,10 +100,10 @@ def test_night_uses_max_and_night_mask():
 
 def test_terminator_selects_cf_trm():
     # At zenith 90: b_trm_day = 0, b_ngt_trm = 1 -> cf_comb == cf_trm (Eq. 17),
-    # and b_ngt_trm = 1 also puts CF_trm on the day interval.
+    # normalized on the terminator's own interval.
     out = confidence(*_inputs(0.6, 0.2, 0.8, cm_day=0.0, zen=90.0))
     raw = 0.6 + 0.2 + C.dt3_weight_trm * 0.8  # = 1.2
-    np.testing.assert_allclose(out["cf_trm"].values, _norm(raw), rtol=1e-6)
+    np.testing.assert_allclose(out["cf_trm"].values, _norm_trm(raw), rtol=1e-6)
     np.testing.assert_allclose(out["cf_comb"].values, out["cf_trm"].values, rtol=1e-6)
 
 
@@ -107,7 +112,7 @@ def test_blend_weight_golden_and_composition():
     out = confidence(*_inputs(0.6, 0.2, 0.8, cm_day=0.0, cm_ngt=0.5, zen=97.5))
     np.testing.assert_allclose(out["b_ngt_trm"].values, B_NGT_TRM_97_5, rtol=1e-4)
     np.testing.assert_allclose(out["b_trm_day"].values, 0.0, atol=1e-12)
-    cf_trm = _norm_trm(0.6 + 0.2 + C.dt3_weight_trm * 0.8, B_NGT_TRM_97_5)
+    cf_trm = _norm_trm(0.6 + 0.2 + C.dt3_weight_trm * 0.8)
     cf_ngt = _norm_ngt((max(0.6, 0.2) + C.dt3_weight_ngt * 0.8) * (1.0 - 0.5))
     expected = B_NGT_TRM_97_5 * cf_trm + (1.0 - B_NGT_TRM_97_5) * cf_ngt
     np.testing.assert_allclose(out["cf_comb"].values, expected, rtol=1e-4)
@@ -156,15 +161,38 @@ def test_night_branch_reaches_one():
     np.testing.assert_allclose(out["cf_comb"].values, 1.0, rtol=1e-6)
 
 
-def test_night_and_day_agree_on_a_shared_signal():
+def test_every_branch_agrees_on_a_shared_signal():
     # The point of the split: the same normalized dust signal reads the same
-    # by day and by night. DT1 = DT2 = DT3 = v gives a day raw of 3v and a
-    # night raw of 1.5v, and the night interval is exactly half the day one,
-    # so both normalize to the same number.
+    # in every branch. DT1 = DT2 = DT3 = v gives raws of 3v, 2.5v and 1.5v,
+    # and each interval is scaled to its own ceiling, so all three normalize
+    # to the same number -- including at 90 deg, where CF_comb is CF_trm.
     for value in (0.2, 0.5, 0.9):
         day = confidence(*_inputs(value, value, value, zen=20.0))
+        terminator = confidence(*_inputs(value, value, value, zen=90.0))
         night = confidence(*_inputs(value, value, value, zen=140.0))
         np.testing.assert_allclose(night["cf_comb"].values, day["cf_comb"].values, rtol=1e-6)
+        np.testing.assert_allclose(terminator["cf_comb"].values, day["cf_comb"].values, rtol=1e-6)
+
+
+def test_terminator_interval_can_be_switched_back_to_interpolation():
+    # cf_norm_trm=None is 0.3.0: no interval of its own, the Eq. 20 weight
+    # interpolating the day and night ones. Kept so the change the 42-day
+    # evaluation scored is reproducible from the same code.
+    legacy = dataclasses.replace(C, cf_norm_trm=None)
+    out = confidence(*_inputs(0.6, 0.2, 0.8, cm_day=0.0, zen=97.5), constants=legacy)
+    raw = 0.6 + 0.2 + C.dt3_weight_trm * 0.8
+    np.testing.assert_allclose(out["cf_trm"].values, _norm_interp(raw, B_NGT_TRM_97_5), rtol=1e-4)
+
+
+def test_the_terminator_read_low_before_its_own_interval():
+    # What the 0.3.0 terminator cost: on the day side of 90 deg CF_trm was
+    # normalized on the day interval, whose ceiling is 3.0, while Eq. 17 only
+    # reaches 2.5 -- so the same dust read lower at dusk than it did at noon.
+    legacy = dataclasses.replace(C, cf_norm_trm=None)
+    args = _inputs(0.5, 0.5, 0.5, zen=90.0)
+    assert confidence(*args, constants=legacy)["cf_trm"].values.max() < (
+        confidence(*args)["cf_trm"].values.min()
+    )
 
 
 def test_cf_norm_alias_restores_the_single_interval():
@@ -190,3 +218,63 @@ def test_replace_still_works():
     tuned = dataclasses.replace(DEFAULTS.confidence, cf_norm_ngt=Bounds(0.1, 1.0))
     assert tuned.cf_norm_ngt == Bounds(0.1, 1.0)
     assert tuned.cf_norm_day == DEFAULTS.confidence.cf_norm_day
+
+
+def test_confidence_raw_matches_the_normalized_branches():
+    # Plan 008 step 4: the raw Eqs. 16-18 sums are what an offline interval
+    # search re-normalizes, so they have to be the very sums confidence()
+    # normalizes -- not a second copy of the equations.
+    tests, cloud, zenith = _inputs(0.6, 0.2, 0.8, cm_day=0.3, cm_ngt=0.5, zen=97.5)
+    raw = confidence_raw(tests, cloud)
+    out = confidence(tests, cloud, zenith)
+    np.testing.assert_allclose(raw["cf_day_raw"].values, (0.6 + 0.2 + 0.8) * (1.0 - 0.3), rtol=1e-6)
+    np.testing.assert_allclose(
+        raw["cf_ngt_raw"].values, (0.6 + C.dt3_weight_ngt * 0.8) * (1.0 - 0.5), rtol=1e-6
+    )
+    np.testing.assert_allclose(out["cf_day"].values, _norm(raw["cf_day_raw"].values), rtol=1e-6)
+    np.testing.assert_allclose(out["cf_ngt"].values, _norm_ngt(raw["cf_ngt_raw"].values), rtol=1e-6)
+    np.testing.assert_allclose(out["cf_trm"].values, _norm_trm(raw["cf_trm_raw"].values), rtol=1e-6)
+
+
+def test_confidence_raw_does_not_depend_on_the_intervals():
+    # Eq. 19 is downstream of these sums: re-tuning the intervals must not
+    # move them, which is what makes one sampled archive enough for a grid.
+    tests, cloud, _ = _inputs(0.6, 0.2, 0.8, cm_day=0.3, cm_ngt=0.5)
+    other = dataclasses.replace(C, cf_norm_day=Bounds(0.0, 1.0), cf_norm_ngt=Bounds(0.05, 0.9))
+    for name, values in confidence_raw(tests, cloud, other).items():
+        np.testing.assert_allclose(values.values, confidence_raw(tests, cloud)[name].values)
+
+
+def test_confidence_raw_requires_its_inputs():
+    tests, cloud, _ = _inputs(0.5, 0.5, 0.5)
+    with pytest.raises(ValueError):
+        confidence_raw(tests.drop_vars("dt3"), cloud)
+    with pytest.raises(ValueError):
+        confidence_raw(tests, cloud.drop_vars("cm_norm_ngt"))
+
+
+def test_confidence_norm_reproduces_confidence():
+    # The two halves compose back into the whole: Eqs. 16-18 then Eqs. 19-22.
+    for zen in (30.0, 90.0, 97.5, 140.0):
+        tests, cloud, zenith = _inputs(0.6, 0.2, 0.8, cm_day=0.3, cm_ngt=0.5, zen=zen)
+        whole = confidence(tests, cloud, zenith)
+        halves = confidence_norm(confidence_raw(tests, cloud), zenith)
+        for name in EXPECTED_VARS:
+            np.testing.assert_allclose(halves[name].values, whole[name].values, rtol=1e-12)
+
+
+def test_confidence_norm_retunes_without_the_dust_tests():
+    # What plan 008 step 4 needs: score a different Eq. 19 night interval on
+    # stored raw sums, with no access to DT1-DT3 or the L1b behind them.
+    tests, cloud, zenith = _inputs(0.6, 0.2, 0.8, cm_ngt=0.0, zen=140.0)
+    raw = confidence_raw(tests, cloud)
+    tuned = dataclasses.replace(C, cf_norm_ngt=Bounds(0.05, 1.0))
+    out = confidence_norm(raw, zenith, tuned)
+    expected = np.clip((raw["cf_ngt_raw"].values - 0.05) / (1.0 - 0.05), 0.0, 1.0)
+    np.testing.assert_allclose(out["cf_comb"].values, expected, rtol=1e-6)
+
+
+def test_confidence_norm_requires_the_raw_sums():
+    tests, cloud, zenith = _inputs(0.5, 0.5, 0.5)
+    with pytest.raises(ValueError):
+        confidence_norm(confidence_raw(tests, cloud).drop_vars("cf_trm_raw"), zenith)

@@ -129,6 +129,15 @@ class DustTestConstants:
 #: half the weight it has in Eq. 16.
 NIGHT_CF_SCALE: float = 0.5
 
+#: Ratio of the Eq. 17 terminator ceiling to the Eq. 16 day ceiling, by the
+#: same argument: Eq. 17 keeps both split-window tests but takes DT3 at
+#: ``dt3_weight_trm``, so it saturates at 2.5 rather than 3.0. With all three
+#: intervals scaled to their own ceiling one dust signal reads the same in
+#: every branch, and Eq. 22 blends like with like -- which is what the
+#: terminator interval was interpolating for. Interpolation is then not only
+#: unnecessary but harmful: it drags CF_trm onto a neighbour's scale.
+TRM_CF_SCALE: float = 2.5 / 3.0
+
 
 def _scaled(bounds: Bounds, factor: float = NIGHT_CF_SCALE) -> Bounds:
     """``bounds`` with both ends multiplied by ``factor``."""
@@ -141,10 +150,14 @@ class ConfidenceConstants:
 
     Eq. 19 is normalization with one interval, but Eqs. 16 and 18 do not
     produce values on one scale (see :data:`NIGHT_CF_SCALE`), so the interval
-    is split here: ``cf_norm_day`` normalizes CF_day, ``cf_norm_ngt``
-    normalizes CF_ngt, and the terminator branch interpolates between them on
-    the Eq. 20 weight, which is 1 on the day side of 90 deg and 0 beyond
-    105 deg -- so CF_trm meets whichever neighbour Eq. 22 is handing it to.
+    is split here, one interval per branch, each scaled to that branch's own
+    raw ceiling: ``cf_norm_day`` for CF_day, ``cf_norm_ngt`` for CF_ngt (see
+    :data:`NIGHT_CF_SCALE`), ``cf_norm_trm`` for CF_trm (see
+    :data:`TRM_CF_SCALE`). Proportional intervals put all three branches on
+    one scale, so Eq. 22 blends comparable numbers and nothing has to be
+    interpolated across the terminator. ``cf_norm_trm=None`` restores 0.3.0,
+    where CF_trm rode the Eq. 20 weight from the day interval to the night
+    one and read low over the whole day side of 90 deg.
 
     ``cf_norm`` is accepted as a constructor-only alias that sets *both*
     intervals to the value given, which is the pre-split behaviour exactly.
@@ -162,6 +175,13 @@ class ConfidenceConstants:
     cf_norm_day: Bounds = field(default_factory=lambda: Bounds(0.25, 2.50))
     #: Eq. 19 for CF_ngt: the same interval scaled by :data:`NIGHT_CF_SCALE`.
     cf_norm_ngt: Bounds = field(default_factory=lambda: Bounds(0.125, 1.25))
+    #: Eq. 19 for CF_trm: the same interval scaled by :data:`TRM_CF_SCALE`.
+    #: ``None`` restores the 0.3.0 behaviour, in which CF_trm had no interval
+    #: of its own and was normalized on the day and night intervals
+    #: interpolated by the Eq. 20 weight.
+    cf_norm_trm: Bounds | None = field(
+        default_factory=lambda: _scaled(Bounds(0.25, 2.50), TRM_CF_SCALE)
+    )
     #: Eqs. 20-21: terminator blending on cos(theta_sun), exponent 1.5.
     blend_exponent: float = 1.5
     #: night/terminator interface: N(cos theta; cos 105 deg, cos 90 deg)
@@ -295,5 +315,6 @@ ABI_TUNED = DebraConstants(
     confidence=ConfidenceConstants(
         cf_norm_day=Bounds(0.40, 2.50),
         cf_norm_ngt=_scaled(Bounds(0.40, 2.50)),
+        cf_norm_trm=_scaled(Bounds(0.40, 2.50), TRM_CF_SCALE),
     ),
 )

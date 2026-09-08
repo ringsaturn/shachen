@@ -166,11 +166,11 @@ def confidence_norm(
     b_ngt_trm = normalize_cos_zenith(zenith_deg, c.ngt_trm_zenith_deg, c.blend_exponent)
     b_trm_day = normalize_cos_zenith(zenith_deg, c.trm_day_zenith_deg, c.blend_exponent)
 
-    # Eq. 19: normalize each variant onto [0, 1] with the interval scaled to
-    # its own raw ceiling -- 3.0, 2.5 and 1.5 for Eqs. 16, 17 and 18 -- so one
-    # dust signal reads the same number in all three. cf_norm_trm=None
-    # restores 0.3.0, where CF_trm had no interval of its own and rode the
-    # Eq. 20 weight from the day interval to the night one.
+    # Eq. 19: normalize each variant onto [0, 1]. Day and night use their own
+    # intervals because Eqs. 16 and 18 have different raw ceilings (3.0 and
+    # 1.5); the terminator, whose ceiling is between them, rides the Eq. 20
+    # weight from one interval to the other -- unless a caller supplied
+    # cf_norm_trm, in which case CF_trm is normalized on that instead.
     cf_day = normalize(raw["cf_day_raw"], c.cf_norm_day)
     cf_ngt = normalize(raw["cf_ngt_raw"], c.cf_norm_ngt)
     if c.cf_norm_trm is None:

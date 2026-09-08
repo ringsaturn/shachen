@@ -20,7 +20,6 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from shachen.calibration import EAST_ASIA_AHI
 from shachen.pipeline import run_debra
 
 EXPECTED_VARS = {
@@ -123,19 +122,6 @@ def test_cf_comb_in_unit_interval(synthetic_output):
     cf = synthetic_output["cf_comb"].values
     assert np.isfinite(cf).all()
     assert ((cf >= 0.0) & (cf <= 1.0)).all()
-
-
-def test_calibration_adds_a_field_without_moving_the_old_one(latlon_area, synthetic_output):
-    # CF_cal is a second field, not a replacement: the product decision behind
-    # it is that CF_comb keeps meaning "fraction of this branch's ceiling".
-    scene, ts, emis = _synthetic_case(latlon_area)
-    out = run_debra(scene, ts, emis, calibration=EAST_ASIA_AHI)
-    assert "cf_cal" in out.data_vars
-    np.testing.assert_array_equal(out["cf_comb"].values, synthetic_output["cf_comb"].values)
-    assert "cf_cal" not in synthetic_output.data_vars
-    # A pure-day scene reads the day branch, which is the calibration's own
-    # reference, so the two fields agree here and diverge only after dark.
-    np.testing.assert_allclose(out["cf_cal"].values, out["cf_comb"].values, rtol=1e-9)
 
 
 # --- precomputed background ---------------------------------------------------

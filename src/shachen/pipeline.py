@@ -14,14 +14,12 @@ so adding an algorithm does not change how one is run.
 import xarray as xr
 
 from shachen import background as _background
-from shachen import calibration as _calibration
 from shachen import cloudmask as _cloudmask
 from shachen import confidence as _confidence
 from shachen import dust_tests as _dust_tests
 from shachen import dustrgb as _dustrgb
 from shachen import geo as _geo
 from shachen import solar as _solar
-from shachen.calibration import Calibration
 from shachen.constants import (
     DEFAULTS,
     DUST_RGB,
@@ -78,7 +76,6 @@ def run_debra(
     constants: DebraConstants = DEFAULTS,
     *,
     background: xr.Dataset | None = None,
-    calibration: Calibration | None = None,
 ) -> xr.Dataset:
     """Run DEBRA on one scene; returns CF_comb plus all intermediate fields.
 
@@ -99,17 +96,11 @@ def run_debra(
       or 2-D shapes differing from the scene raise ValueError. Its
       ``n_valid`` is passed through to the output when present.
 
-    ``calibration`` adds ``cf_cal`` to the output: the same confidence read on
-    a precision scale instead of a physical one (:mod:`shachen.calibration`).
-    It is a second field, not a replacement -- ``cf_comb`` is identical with
-    and without it.
-
     Returns a Dataset on the scene grid carrying ``cf_comb``, ``cf_day``,
     ``cf_trm``, ``cf_ngt``, ``cm_norm_day``, ``cm_norm_ngt``, ``dt1``-``dt3``,
-    ``rsw_bg``, ``btd_bg``, and ``zenith_deg`` (plus ``cf_cal`` when
-    ``calibration`` is given), with the scene's ``area`` and ``start_time``
-    attrs preserved. Pixels with NaN inputs (off-disk, bad pixels) carry NaN
-    confidence.
+    ``rsw_bg``, ``btd_bg``, and ``zenith_deg``, with the scene's ``area`` and
+    ``start_time`` attrs preserved. Pixels with NaN inputs (off-disk, bad
+    pixels) carry NaN confidence.
     """
     if (emissivity is None) == (background is None):
         raise ValueError(
@@ -149,11 +140,6 @@ def run_debra(
 
     merged = xr.merge([cf, dt, cm, bg], combine_attrs="drop")
     out = xr.Dataset({name: merged[name] for name in _OUTPUT_VARS})
-    if calibration is not None:
-        raw = _confidence.confidence_raw(dt, cm, constants.confidence)
-        out["cf_cal"] = _calibration.calibrate(raw, zenith, calibration, constants.confidence)[
-            "cf_cal"
-        ]
     out["zenith_deg"] = zenith
     out["is_land"] = is_land
     if "n_valid" in bg:

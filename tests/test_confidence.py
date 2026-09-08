@@ -52,13 +52,20 @@ def _norm_ngt(raw):
     return _norm(raw, C.cf_norm_ngt)
 
 
+#: An opt-in terminator interval: the day one scaled by Eq. 17's ceiling over
+#: Eq. 16's. Not what shachen normalizes with -- it is what a caller who wants
+#: every branch on one scale would pass, and these tests pin the hook, not a
+#: recommendation.
+TRM_SCALED = Bounds(C.cf_norm_day.min * 2.5 / 3.0, C.cf_norm_day.max * 2.5 / 3.0)
+
+
 def _norm_trm(raw):
-    """Eq. 19 on the terminator's own interval (Eq. 17 ceiling 2.5)."""
-    return _norm(raw, C.cf_norm_trm)
+    """Eq. 19 on a terminator interval of its own (Eq. 17 ceiling 2.5)."""
+    return _norm(raw, TRM_SCALED)
 
 
 def _norm_interp(raw, weight):
-    """Eq. 19 with the interval interpolated -- the 0.3.0 terminator."""
+    """Eq. 19 with the interval interpolated -- what shachen does."""
     lower = weight * C.cf_norm_day.min + (1.0 - weight) * C.cf_norm_ngt.min
     upper = weight * C.cf_norm_day.max + (1.0 - weight) * C.cf_norm_ngt.max
     return np.clip((raw - lower) / (upper - lower), 0.0, 1.0)
@@ -100,10 +107,10 @@ def test_night_uses_max_and_night_mask():
 
 def test_terminator_selects_cf_trm():
     # At zenith 90: b_trm_day = 0, b_ngt_trm = 1 -> cf_comb == cf_trm (Eq. 17),
-    # normalized on the terminator's own interval.
+    # and b_ngt_trm = 1 also puts CF_trm on the day interval.
     out = confidence(*_inputs(0.6, 0.2, 0.8, cm_day=0.0, zen=90.0))
     raw = 0.6 + 0.2 + C.dt3_weight_trm * 0.8  # = 1.2
-    np.testing.assert_allclose(out["cf_trm"].values, _norm_trm(raw), rtol=1e-6)
+    np.testing.assert_allclose(out["cf_trm"].values, _norm(raw), rtol=1e-6)
     np.testing.assert_allclose(out["cf_comb"].values, out["cf_trm"].values, rtol=1e-6)
 
 
@@ -112,7 +119,7 @@ def test_blend_weight_golden_and_composition():
     out = confidence(*_inputs(0.6, 0.2, 0.8, cm_day=0.0, cm_ngt=0.5, zen=97.5))
     np.testing.assert_allclose(out["b_ngt_trm"].values, B_NGT_TRM_97_5, rtol=1e-4)
     np.testing.assert_allclose(out["b_trm_day"].values, 0.0, atol=1e-12)
-    cf_trm = _norm_trm(0.6 + 0.2 + C.dt3_weight_trm * 0.8)
+    cf_trm = _norm_interp(0.6 + 0.2 + C.dt3_weight_trm * 0.8, B_NGT_TRM_97_5)
     cf_ngt = _norm_ngt((max(0.6, 0.2) + C.dt3_weight_ngt * 0.8) * (1.0 - 0.5))
     expected = B_NGT_TRM_97_5 * cf_trm + (1.0 - B_NGT_TRM_97_5) * cf_ngt
     np.testing.assert_allclose(out["cf_comb"].values, expected, rtol=1e-4)
@@ -161,38 +168,35 @@ def test_night_branch_reaches_one():
     np.testing.assert_allclose(out["cf_comb"].values, 1.0, rtol=1e-6)
 
 
-def test_every_branch_agrees_on_a_shared_signal():
+def test_night_and_day_agree_on_a_shared_signal():
     # The point of the split: the same normalized dust signal reads the same
-    # in every branch. DT1 = DT2 = DT3 = v gives raws of 3v, 2.5v and 1.5v,
-    # and each interval is scaled to its own ceiling, so all three normalize
-    # to the same number -- including at 90 deg, where CF_comb is CF_trm.
+    # by day and by night. DT1 = DT2 = DT3 = v gives a day raw of 3v and a
+    # night raw of 1.5v, and the night interval is exactly half the day one,
+    # so both normalize to the same number.
     for value in (0.2, 0.5, 0.9):
         day = confidence(*_inputs(value, value, value, zen=20.0))
-        terminator = confidence(*_inputs(value, value, value, zen=90.0))
         night = confidence(*_inputs(value, value, value, zen=140.0))
         np.testing.assert_allclose(night["cf_comb"].values, day["cf_comb"].values, rtol=1e-6)
-        np.testing.assert_allclose(terminator["cf_comb"].values, day["cf_comb"].values, rtol=1e-6)
 
 
-def test_terminator_interval_can_be_switched_back_to_interpolation():
-    # cf_norm_trm=None is 0.3.0: no interval of its own, the Eq. 20 weight
-    # interpolating the day and night ones. Kept so the change the 42-day
-    # evaluation scored is reproducible from the same code.
-    legacy = dataclasses.replace(C, cf_norm_trm=None)
-    out = confidence(*_inputs(0.6, 0.2, 0.8, cm_day=0.0, zen=97.5), constants=legacy)
+def test_cf_norm_trm_is_off_unless_a_caller_sets_it():
+    # The hook must not change what DEBRA does by default: with cf_norm_trm
+    # unset CF_trm is still the interpolated normalization.
+    assert C.cf_norm_trm is None
+    out = confidence(*_inputs(0.6, 0.2, 0.8, cm_day=0.0, zen=97.5))
     raw = 0.6 + 0.2 + C.dt3_weight_trm * 0.8
     np.testing.assert_allclose(out["cf_trm"].values, _norm_interp(raw, B_NGT_TRM_97_5), rtol=1e-4)
 
 
-def test_the_terminator_read_low_before_its_own_interval():
-    # What the 0.3.0 terminator cost: on the day side of 90 deg CF_trm was
-    # normalized on the day interval, whose ceiling is 3.0, while Eq. 17 only
-    # reaches 2.5 -- so the same dust read lower at dusk than it did at noon.
-    legacy = dataclasses.replace(C, cf_norm_trm=None)
-    args = _inputs(0.5, 0.5, 0.5, zen=90.0)
-    assert confidence(*args, constants=legacy)["cf_trm"].values.max() < (
-        confidence(*args)["cf_trm"].values.min()
-    )
+def test_cf_norm_trm_overrides_the_interpolation_when_given():
+    # And when it is set, CF_trm normalizes on it and nothing else does.
+    tuned = dataclasses.replace(C, cf_norm_trm=TRM_SCALED)
+    args = _inputs(0.6, 0.2, 0.8, cm_day=0.0, zen=97.5)
+    out = confidence(*args, constants=tuned)
+    raw = 0.6 + 0.2 + C.dt3_weight_trm * 0.8
+    np.testing.assert_allclose(out["cf_trm"].values, _norm_trm(raw), rtol=1e-6)
+    for name in ("cf_day", "cf_ngt"):
+        np.testing.assert_allclose(out[name].values, confidence(*args)[name].values, rtol=1e-12)
 
 
 def test_cf_norm_alias_restores_the_single_interval():
@@ -233,7 +237,11 @@ def test_confidence_raw_matches_the_normalized_branches():
     )
     np.testing.assert_allclose(out["cf_day"].values, _norm(raw["cf_day_raw"].values), rtol=1e-6)
     np.testing.assert_allclose(out["cf_ngt"].values, _norm_ngt(raw["cf_ngt_raw"].values), rtol=1e-6)
-    np.testing.assert_allclose(out["cf_trm"].values, _norm_trm(raw["cf_trm_raw"].values), rtol=1e-6)
+    np.testing.assert_allclose(
+        out["cf_trm"].values,
+        _norm_interp(raw["cf_trm_raw"].values, B_NGT_TRM_97_5),
+        rtol=1e-4,
+    )
 
 
 def test_confidence_raw_does_not_depend_on_the_intervals():

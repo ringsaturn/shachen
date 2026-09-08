@@ -133,6 +133,18 @@ def confidence(
     return confidence_norm(confidence_raw(tests, cloud, constants), zenith_deg, constants)
 
 
+def blend_confidence(cf_day, cf_trm, cf_ngt, b_ngt_trm, b_trm_day):
+    """Eq. 22 (erratum): the nested day / terminator / night blend.
+
+    Split out so that anything normalizing the branches differently --
+    :mod:`shachen.calibration` does -- blends them the same way rather than
+    keeping a second copy of Eq. 22.
+    """
+    return b_trm_day * cf_day + (1.0 - b_trm_day) * (
+        b_ngt_trm * cf_trm + (1.0 - b_ngt_trm) * cf_ngt
+    )
+
+
 def confidence_norm(
     raw: xr.Dataset,
     zenith_deg,
@@ -166,10 +178,7 @@ def confidence_norm(
     else:
         cf_trm = normalize(raw["cf_trm_raw"], c.cf_norm_trm)
 
-    # Eq. 22 (erratum): nested day / terminator / night blend.
-    cf_comb = b_trm_day * cf_day + (1.0 - b_trm_day) * (
-        b_ngt_trm * cf_trm + (1.0 - b_ngt_trm) * cf_ngt
-    )
+    cf_comb = blend_confidence(cf_day, cf_trm, cf_ngt, b_ngt_trm, b_trm_day)
 
     return xr.Dataset(
         {

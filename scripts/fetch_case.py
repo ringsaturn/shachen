@@ -79,8 +79,17 @@ def _scan_start(key: str) -> dt.datetime:
     return dt.datetime.strptime(stamp, "%Y%j%H%M%S")
 
 
-def fetch_abi(case: Case, out_dir: Path) -> list[Path]:
-    """Download the ``ABI_CHANNELS`` bands for the scan nearest case.when."""
+def fetch_abi(
+    case: Case, out_dir: Path, channels: tuple[str, ...] = ABI_CHANNELS
+) -> list[Path]:
+    """Download ``channels`` for the scan nearest case.when.
+
+    Mirrors :func:`fetch_ahi`'s ``channels`` argument: a caller that only
+    feeds DEBRA can pin the 7 bands and skip C14, which nothing but the
+    classic Dust RGB baseline reads. Unlike the AHI cache, the exists-check
+    is per file rather than per directory, so widening the set later only
+    downloads the missing channels.
+    """
     import s3fs
 
     fs = s3fs.S3FileSystem(anon=True)
@@ -89,7 +98,7 @@ def fetch_abi(case: Case, out_dir: Path) -> list[Path]:
 
     out_dir.mkdir(parents=True, exist_ok=True)
     local: list[Path] = []
-    for chan in ABI_CHANNELS:
+    for chan in channels:
         candidates = [k for k in keys if f"{chan}_" in k]
         if not candidates:
             raise RuntimeError(f"No {chan} files under s3://{prefix}")

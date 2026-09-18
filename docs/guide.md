@@ -73,6 +73,27 @@ result["zenith_deg"]  # per-pixel solar zenith
 pipeline regrids it via {func}`shachen.geo.regrid_latlon`. Pixels with
 NaN inputs (off-disk, bad pixels) carry NaN confidence throughout.
 
+### Running ZHOUYE
+
+{func}`shachen.pipeline.run_zhouye` (昼夜, "day and night") runs the same
+chain with the {data}`shachen.constants.ZHOUYE` preset. It changes three
+things, all in the terminator and night confidence sums (Eqs. 17–18) and none
+in the daytime sum: the 8.6 − 10.4 µm test is read on a fixed interval instead
+of Eq. 14 (`dt2_fixed`, emitted next to Eq. 14's `dt2`), a pixel lit by the
+thermal-contrast test alone gets no confidence, and the night and terminator
+normalisation intervals are fitted so that dust reads the same confidence as
+by day. Below a solar zenith of 75° the output equals `run_debra` with
+`ABI_TUNED` exactly; beyond it the reading on dust stays at the day's level. The scheme, the ground
+truth behind it and what it costs are described in a paper in preparation.
+
+```python
+result = shachen.run_zhouye(scene, skin_temperature=merra_ts, emissivity=camel)
+result.attrs["scheme"]  # "zhouye"
+```
+
+The three hooks are off in `DEFAULTS` and `ABI_TUNED`, so DEBRA's output is
+untouched.
+
 ### Choosing a background
 
 The clear-sky background is estimated per pixel, by one of two schemes.

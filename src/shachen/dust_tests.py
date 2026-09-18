@@ -16,7 +16,7 @@ with the surface shift S = -10 K (land) / +5 K (ocean) applied as printed
 import numpy as np
 import xarray as xr
 
-from shachen.constants import DEFAULTS, DustTestConstants
+from shachen.constants import DEFAULTS, Bounds, DustTestConstants
 
 
 def _where(condition, if_true, if_false):
@@ -55,8 +55,24 @@ def dt1(rsw_obs, rsw_bg, constants: DustTestConstants = DEFAULTS.dust_tests):
 
 
 def dt2(btd_obs, btd_bg, constants: DustTestConstants = DEFAULTS.dust_tests):
-    """Eq. 14: like :func:`dt1` for ``BTD = BT8.6 - BT10.4`` with MAX = 3.0 K."""
+    """Eq. 14: like :func:`dt1` for ``BTD = BT8.6 - BT10.4`` with MAX = 3.0 K.
+
+    Always Eq. 14, whatever scheme the constants describe: the ZHOUYE hook
+    ``dt2_fixed_interval`` is a *second* reading of the same difference
+    (:func:`dt2_fixed`) that :func:`dust_tests` emits alongside this one, and
+    only Eqs. 17-18 read it. Eq. 16, the daytime sum, reads this test.
+    """
     return _dynamic_test(btd_obs, btd_bg, constants.dt2_max_btd_k)
+
+
+def dt2_fixed(btd_obs, interval: Bounds):
+    """ZHOUYE's DT2: ``N(BTD_obs; min, max)`` on a fixed interval.
+
+    No dynamic background is read: the clear-sky side of the 8.6 - 10.4 um
+    difference, which Eq. 14 clips away, is kept. Array-generic; NaN
+    propagates.
+    """
+    return np.clip((btd_obs - interval.min) / (interval.max - interval.min), 0.0, 1.0)
 
 
 def dt3(
@@ -88,7 +104,11 @@ def dust_tests(
     ``background`` needs ``rsw_bg``, ``btd_bg`` (from
     :func:`shachen.background.background_signals`). All 2-D inputs must share one
     shape (ValueError otherwise). Returns a Dataset with ``dt1``, ``dt2``,
-    ``dt3`` in [0, 1] (NaN where inputs are NaN).
+    ``dt3`` in [0, 1] (NaN where inputs are NaN), plus ``dt2_fixed`` when
+    ``constants.dt2_fixed_interval`` is set (the ZHOUYE scheme): ``dt2`` is
+    Eq. 14 in either case, ``dt2_fixed`` is :func:`dt2_fixed` on that
+    interval, and :func:`shachen.confidence.confidence_raw` reads the latter
+    in Eqs. 17-18 only.
     """
     fields = {
         "bt_tir_86": scene["bt_tir_86"],
@@ -106,10 +126,13 @@ def dust_tests(
     bt_104 = fields["bt_tir_104"]
     rsw_obs = fields["bt_tir_123"] - bt_104
     btd_obs = fields["bt_tir_86"] - bt_104
-    return xr.Dataset(
+    out = xr.Dataset(
         {
             "dt1": dt1(rsw_obs, fields["rsw_bg"], constants),
             "dt2": dt2(btd_obs, fields["btd_bg"], constants),
             "dt3": dt3(bt_104, skin_temperature, is_land, constants),
         }
     )
+    if constants.dt2_fixed_interval is not None:
+        out["dt2_fixed"] = dt2_fixed(btd_obs, constants.dt2_fixed_interval)
+    return out

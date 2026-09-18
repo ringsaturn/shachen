@@ -5,9 +5,11 @@ down-sampling of the VIS/NIR bands onto the coarsest (2 km) grid, so ABI
 netCDF and Himawari AHI HSD share one code path.
 """
 
+import tempfile
 from collections.abc import Iterable
 from pathlib import Path
 
+import satpy
 import xarray as xr
 from satpy import Scene
 
@@ -45,20 +47,32 @@ def load_scene(
     band_map = _READERS[reader]
     if roles is not None:
         band_map = {role: band_map[role] for role in roles}
-    scn = Scene(filenames=[str(f) for f in files], reader=reader)
-    scn.load(list(band_map.values()))
-    # Native resampling aggregates the 0.5/1 km reflective bands onto the
-    # coarsest-loaded (2 km IR) grid without interpolation artifacts.
-    scn = scn.resample(scn.coarsest_area(), resampler="native")
-    if bbox is not None:
-        # Cropping after the resample keeps every dataset on one shared area.
-        scn = scn.crop(ll_bbox=bbox)
+    # satpy unpacks bz2-compressed AHI HSD segments into ``config["tmp_dir"]``
+    # and relies on ``weakref.finalize(self, self._cleanup)`` to delete them --
+    # a bound method that keeps the file handler alive, so the files outlive
+    # the Scene and are only removed at interpreter exit (never, if the
+    # process is killed). Measured 2026-09-17: 3 leaked files per single-band
+    # load, ~430 MB per 15-scene composite, 93 GB on one batch worker. Giving
+    # each load its own tmp_dir and computing the arrays before it goes away
+    # bounds that to the life of this call; ABI netCDF never touches it.
+    with (
+        tempfile.TemporaryDirectory(prefix="shachen-l1b-") as tmp_dir,
+        satpy.config.set(tmp_dir=tmp_dir),
+    ):
+        scn = Scene(filenames=[str(f) for f in files], reader=reader)
+        scn.load(list(band_map.values()))
+        # Native resampling aggregates the 0.5/1 km reflective bands onto the
+        # coarsest-loaded (2 km IR) grid without interpolation artifacts.
+        scn = scn.resample(scn.coarsest_area(), resampler="native")
+        if bbox is not None:
+            # Cropping after the resample keeps every dataset on one shared area.
+            scn = scn.crop(ll_bbox=bbox)
 
-    data_vars = {}
-    for role, name in band_map.items():
-        da = scn[name].drop_vars("crs", errors="ignore")
-        prefix = "refl" if role in _REFLECTIVE else "bt"
-        data_vars[f"{prefix}_{role.value}"] = da
+        data_vars = {}
+        for role, name in band_map.items():
+            da = scn[name].drop_vars("crs", errors="ignore").load()
+            prefix = "refl" if role in _REFLECTIVE else "bt"
+            data_vars[f"{prefix}_{role.value}"] = da
     ds = xr.Dataset(data_vars)
     ds.attrs["area"] = scn.coarsest_area()
     ds.attrs["start_time"] = scn.start_time

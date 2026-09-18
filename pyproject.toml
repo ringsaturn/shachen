@@ -101,9 +101,15 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.4",
     "shachen[all]",
+    {include-group = "labs"},
 ]
 # Building docs/ needs no extras: satpy is the one module-level import in the
 # package, and conf.py mocks it; everything else is either core or lazy.
+# labs/zhouye reads station matchups as parquet and plots with pandas.
+labs = [
+    "pandas>=2.2",
+    "pyarrow>=17",
+]
 docs = [
     "furo>=2024.8.6",
     "myst-parser>=4.0.0",

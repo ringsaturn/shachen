@@ -112,6 +112,19 @@ class DustTestConstants:
     dt1_max_rsw_k: float = 3.5
     #: DT2 (Eq. 14): (BTD_obs - BTD_bg) / (max_btd_k - BTD_bg), BTD = BT8.6 - BT10.4
     dt2_max_btd_k: float = 3.0
+    #: A second DT2 reading, on a fixed interval instead of Eq. 14's dynamic
+    #: background: ``N(BTD_obs; min, max)``, emitted as ``dt2_fixed`` next
+    #: to ``dt2`` and read by Eqs. 17-18 only (Eq. 16 keeps Eq. 14). ``None``,
+    #: the default, is the published chain exactly. The hook exists for
+    #: :data:`ZHOUYE`: on 1.19 M station-hours over North China (42 dust
+    #: days, all 24 hours) the raw 8.6 - 10.4 um difference ranks dust at
+    #: AUC 0.85 / 0.80 / 0.80 (day / terminator / night) while Eq. 14's
+    #: output ranks at 0.64 / 0.60 / 0.59 with 95% of the rows clipped to
+    #: zero -- the background subtraction, the clip at zero and the 3 K range
+    #: discard the clear-sky side of the signal that the classic Dust RGB's
+    #: green gun keeps. By day that side buys no equal-FAR detection, so the
+    #: daytime sum is left as DEBRA printed it.
+    dt2_fixed_interval: Bounds | None = None
     #: DT3 (Eq. 15): (BT10.4 - (T_merra - S - dt3_depth_k)) / dt3_depth_k
     dt3_shift_land_k: float = -10.0
     dt3_shift_ocean_k: float = 5.0
@@ -177,6 +190,15 @@ class ConfidenceConstants:
     ngt_trm_zenith_deg: Bounds = field(default_factory=lambda: Bounds(105.0, 90.0))
     #: terminator/day interface: N(cos theta; cos 90 deg, cos 75 deg)
     trm_day_zenith_deg: Bounds = field(default_factory=lambda: Bounds(90.0, 75.0))
+    #: Corroboration: pixels where DT1 and DT2 are both zero contribute nothing
+    #: to Eqs. 17-18 (their raw sums are set to 0 before Eq. 19). Eq. 16 is
+    #: not touched, so by day the product stays DEBRA's. ``False``, the
+    #: default, is the published behaviour. This is the ZHOUYE scheme's third
+    #: item: a pixel whose only evidence is DT3 -- the thermal-contrast test
+    #: that reads the same skin-temperature gap as cloud mask CM1 -- is
+    #: mid-level cloud or a skin-temperature error far more often than dust
+    #: (plans/refer/008 in the research repo).
+    corroborate_dt3: bool = False
     #: Deprecated alias: sets cf_norm_day and cf_norm_ngt to the same interval
     #: (the pre-0.3 single-interval behaviour). Constructor-only.
     cf_norm: InitVar[Bounds | None] = None
@@ -304,5 +326,61 @@ ABI_TUNED = DebraConstants(
     confidence=ConfidenceConstants(
         cf_norm_day=Bounds(0.40, 2.50),
         cf_norm_ngt=_scaled(Bounds(0.40, 2.50)),
+    ),
+)
+
+#: ZHOUYE (昼夜, "day and night"): a diurnally consistent dust confidence
+#: scheme built on DEBRA's tests and cloud mask. It is a second algorithm in
+#: this package, not a retune of DEBRA -- :data:`DEFAULTS` and
+#: :data:`ABI_TUNED` do not change when it does. Three departures, each a
+#: hook that is off in the DEBRA presets, and all three act on the
+#: terminator and night sums (Eqs. 17-18) only: Eq. 16 and its interval are
+#: DEBRA's, so wherever the Eq. 20 weight is 1 (solar zenith below 75 deg)
+#: CF_comb is :data:`ABI_TUNED`'s bit for bit, and the scheme is a night-side
+#: extension that blends into DEBRA across 75-90 deg. The goal it is built
+#: to is one reading for one dust around the clock: no fading at dusk (DEBRA)
+#: and no brightening after dark.
+#:
+#: 1. DT2 on a fixed interval (``dt2_fixed_interval``) in Eqs. 17-18 instead
+#:    of Eq. 14: the same 8.6 - 10.4 um channels, but the clear-sky side of
+#:    the difference is kept, which is where most of the night-time ranking
+#:    lives. Eq. 16 keeps Eq. 14: by day the fixed interval buys no
+#:    equal-FAR detection and only re-labels the plume upward. The interval
+#:    is (-0.5, +1.5) K. The equal-FAR optimum on the 42 dust days is the
+#:    1 K step (-0.5, +0.5) (night POD at DEBRA's FAR@0.2 0.165 -> 0.323,
+#:    19/19 leave-one-event-out folds), but a step saturates on nearly every
+#:    dust pixel and, through Eq. 18's max, puts every lit night pixel on one
+#:    plateau that no Eq. 19 interval can spread into the day's 0.2-0.8
+#:    gradation; the +1.5 K ceiling lets the reading grade with BTD and
+#:    costs 0.04 of that equal-FAR POD (0.281, still +0.12 over DEBRA).
+#: 2. DT3 needs corroboration (``corroborate_dt3``) in Eqs. 17-18: a pixel
+#:    lit by the thermal-contrast test alone contributes nothing there.
+#: 3. Eq. 19 intervals for the terminator and night sums fitted so that lit
+#:    dust reads as it does by day (``cf_norm_ngt``, ``cf_norm_trm``): the
+#:    ceiling-proportional split of :data:`ABI_TUNED` was right for DEBRA's
+#:    sums, where DT2 is mostly zero, but with the fixed-interval DT2 the
+#:    night sum sits far higher relative to its ceiling than the day sum
+#:    does. The intervals here are the grid cells that bring the
+#:    p25/p50/p75/p90 of CF_comb on lit dust rows (PM10 >= 600, CF >= 0.1)
+#:    at night (> 105 deg) and across the terminator (75-105 deg) closest to
+#:    the day rows' under DEBRA on the 42 dust days, among cells that light
+#:    no larger share of clean rows than the day does: night 0.22 / 0.38 /
+#:    0.59 / 0.73 and terminator 0.20 / 0.34 / 0.59 / 0.77 against the day's
+#:    0.19 / 0.33 / 0.58 / 0.78 (DEBRA's own night interval reads 0.18 /
+#:    0.31 / 0.51 / 0.77 on the few pixels it lights). Eq. 19 is a monotone
+#:    map, so this fixes what a threshold means and leaves the ranking above
+#:    the floor untouched. The night ceiling 1.5 maps to CF 0.97.
+#:
+#: What it costs: on no-dust days the night false alarms that Eq. 14
+#: suppressed come back (labs/012 in the research repo). The cloud-mask
+#: constants and the day interval are ABI_TUNED's. Shares DEBRA's tests and
+#: cloud mask; it is not an independent retrieval.
+ZHOUYE = DebraConstants(
+    dust_tests=DustTestConstants(dt2_fixed_interval=Bounds(-0.5, 1.5)),
+    confidence=ConfidenceConstants(
+        cf_norm_day=Bounds(0.40, 2.50),
+        cf_norm_ngt=Bounds(0.10, 1.55),
+        cf_norm_trm=Bounds(0.60, 2.10),
+        corroborate_dt3=True,
     ),
 )

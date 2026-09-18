@@ -5,10 +5,14 @@ derive solar zenith and land mask, then chain background -> cloud mask ->
 dust tests -> confidence. Enhanced imagery (Eqs. 23-29) is in
 :mod:`shachen.imagery`.
 
+:func:`run_zhouye` is ZHOUYE, the diurnally consistent confidence scheme
+built on DEBRA's tests and cloud mask: the same chain with the
+:data:`shachen.constants.ZHOUYE` preset, tagged ``scheme="zhouye"``.
+
 :func:`run_dust_rgb` is the classic Dust RGB baseline, which needs no
 ancillary data at all but does need to know which sensor it is looking at.
-Callers reach both through this module rather than the per-equation modules,
-so adding an algorithm does not change how one is run.
+Callers reach all of them through this module rather than the per-equation
+modules, so adding an algorithm does not change how one is run.
 """
 
 import xarray as xr
@@ -24,6 +28,7 @@ from shachen.constants import (
     DEFAULTS,
     DUST_RGB,
     DUST_RGB_BY_READER,
+    ZHOUYE,
     DebraConstants,
     DustRGBConstants,
 )
@@ -140,11 +145,49 @@ def run_debra(
 
     merged = xr.merge([cf, dt, cm, bg], combine_attrs="drop")
     out = xr.Dataset({name: merged[name] for name in _OUTPUT_VARS})
+    if "dt2_fixed" in dt:
+        # ZHOUYE: the second DT2 reading that Eqs. 17-18 used; dt2 stays Eq. 14.
+        out["dt2_fixed"] = dt["dt2_fixed"]
     out["zenith_deg"] = zenith
     out["is_land"] = is_land
     if "n_valid" in bg:
         out["n_valid"] = bg["n_valid"]
     out.attrs.update(scene.attrs)
+    # Which confidence scheme produced cf_comb. DEBRA unless the constants
+    # turn on a ZHOUYE hook; run_zhouye sets it explicitly.
+    out.attrs["scheme"] = (
+        "zhouye"
+        if constants.dust_tests.dt2_fixed_interval is not None
+        or constants.confidence.corroborate_dt3
+        else "debra"
+    )
+    return out
+
+
+def run_zhouye(
+    scene: xr.Dataset,
+    skin_temperature: xr.DataArray,
+    emissivity: xr.Dataset | None = None,
+    constants: DebraConstants = ZHOUYE,
+    *,
+    background: xr.Dataset | None = None,
+) -> xr.Dataset:
+    """Run ZHOUYE on one scene: :func:`run_debra`'s chain with the ZHOUYE preset.
+
+    Same inputs and outputs as :func:`run_debra` (it *is* that chain -- the
+    tests, cloud mask, blending and imagery are DEBRA's), with three things
+    switched on through the constants: DT2 on a fixed interval in Eqs. 17-18
+    instead of Eq. 14, DT3 needing corroboration there, and terminator and
+    night Eq. 19 intervals fitted so the same dust reads the same as by day.
+    Eq. 16 is untouched, so by day (solar zenith below 75 deg) ``cf_comb``
+    equals a :data:`ABI_TUNED` run's bit for bit; the two diverge across the
+    terminator and at night. See
+    :data:`shachen.constants.ZHOUYE` for the claim each hook buys and what
+    it does not. The output is tagged ``attrs["scheme"] == "zhouye"`` and
+    carries ``dt2_fixed`` next to ``dt2``.
+    """
+    out = run_debra(scene, skin_temperature, emissivity, constants, background=background)
+    out.attrs["scheme"] = "zhouye"
     return out
 
 

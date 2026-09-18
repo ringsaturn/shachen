@@ -63,6 +63,13 @@ satellite's operational product. The [Dust RGB
 page](https://ringsaturn.github.io/shachen/api/dustrgb.html) has the table and
 the references.
 
+The third algorithm is ZHOUYE (昼夜, "day and night"), `pipeline.run_zhouye`:
+DEBRA's chain with three changes to the terminator and night confidence sums
+and none to the daytime one, so by day it is DEBRA (ABI-retuned) bit for bit
+and at night dust reads at the day's level. The scheme, the
+data behind it and what it costs are described in a paper in preparation;
+`constants.ZHOUYE` documents the three hooks, all off in the DEBRA presets.
+
 ## Documentation
 
 <https://ringsaturn.github.io/shachen/> — user guide, all 29 equations as
@@ -141,7 +148,7 @@ takes `cf_norm_day` and `cf_norm_ngt` in place of `cf_norm`; passing
 0.2.x exactly:
 
 ```python
-ConfidenceConstants(cf_norm=Bounds(0.25, 2.50))   # pre-0.3 behaviour
+ConfidenceConstants(cf_norm=Bounds(0.25, 2.50))  # pre-0.3 behaviour
 ```
 
 Reading `constants.confidence.cf_norm` back now yields `None` (it is an
@@ -164,6 +171,7 @@ share nothing but their input bands:
 |---|---|
 | `run_debra` — DEBRA-Dust | Miller et al. (2017) |
 | `run_dust_rgb` — Dust RGB baseline | Lensky and Rosenfeld (2008), plus the recipe for your sensor |
+| `run_zhouye` — ZHOUYE | Miller et al. (2017) for the chain; the ZHOUYE paper once published |
 | both, e.g. a side-by-side comparison | all of the above |
 
 DEBRA-Dust, the algorithm this package implements:

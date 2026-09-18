@@ -79,9 +79,7 @@ def _scan_start(key: str) -> dt.datetime:
     return dt.datetime.strptime(stamp, "%Y%j%H%M%S")
 
 
-def fetch_abi(
-    case: Case, out_dir: Path, channels: tuple[str, ...] = ABI_CHANNELS
-) -> list[Path]:
+def fetch_abi(case: Case, out_dir: Path, channels: tuple[str, ...] = ABI_CHANNELS) -> list[Path]:
     """Download ``channels`` for the scan nearest case.when.
 
     Mirrors :func:`fetch_ahi`'s ``channels`` argument: a caller that only

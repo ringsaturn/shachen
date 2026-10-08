@@ -155,6 +155,16 @@ Reading `constants.confidence.cf_norm` back now yields `None` (it is an
 `InitVar`), so `cf_norm.min` raises rather than silently normalizing with
 the wrong bounds. Read `cf_norm_day` / `cf_norm_ngt`.
 
+### What changed in 0.4.0
+
+Nothing in the DEBRA presets: `DEFAULTS` and `ABI_TUNED` produce the same
+numbers as 0.3.0. `ZHOUYE` is a new preset and `run_zhouye` a new entry point;
+`dust_tests` emits a `dt2_fixed` field only when `dt2_fixed_interval` is set,
+and `confidence_raw` reads it in Eqs. 17--18 only. `load_scene` now returns
+computed arrays rather than lazy dask arrays, so that satpy's bz2 temp files
+for AHI HSD are deleted with the call instead of at interpreter exit; a caller
+that relied on the laziness pays the load up front.
+
 All of it, with the reasoning and the numbers, is in
 [`docs/deviations.md`](docs/deviations.md). Read that before changing any of
 it. `constants.py` is the single source of every calibration bound, offset and

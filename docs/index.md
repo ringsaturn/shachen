@@ -6,7 +6,9 @@ of DEBRA-Dust, the Dynamic Enhancement with Background Reduction Algorithm
 Himawari AHI.
 
 *shachen* (沙尘) is Chinese for "sand and dust". The package is a home for
-infrared-channel dust algorithms; DEBRA-Dust is the first one.
+infrared-channel dust algorithms: DEBRA-Dust, the classic Dust RGB as its
+baseline, and ZHOUYE, DEBRA's chain with changes to its terminator and night sums only (see the [user
+guide](guide.md#running-zhouye)).
 
 ```{raw} html
 <p>The whole manual is also available as a single PDF:

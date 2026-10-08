@@ -60,6 +60,14 @@ def confidence_raw(
 
     ``tests`` needs ``dt1``, ``dt2``, ``dt3``; ``cloud`` needs
     ``cm_norm_day``, ``cm_norm_ngt``.
+
+    The ZHOUYE hooks act on Eqs. 17-18 only. Eq. 16, the daytime sum, is
+    DEBRA's whatever the constants say: with ``dt2_fixed`` present in
+    ``tests`` (from :func:`shachen.dust_tests.dust_tests` under
+    ``dt2_fixed_interval``) the terminator and night sums read it in place
+    of ``dt2``, and with ``corroborate_dt3`` on those two sums are zeroed
+    where DT1 and that DT2 are both zero. Where the Eq. 20 weight is 1
+    (solar zenith below 75 deg) CF_comb is therefore DEBRA's bit for bit.
     """
     _require(tests, _TEST_VARS, "tests")
     _require(cloud, _CLOUD_VARS, "cloud")
@@ -67,18 +75,29 @@ def confidence_raw(
     dt1 = tests["dt1"]
     dt2 = tests["dt2"]
     dt3 = tests["dt3"]
+    dt2_ngt = tests["dt2_fixed"] if "dt2_fixed" in tests else dt2
     cm_day = cloud["cm_norm_day"]
     cm_ngt = cloud["cm_norm_ngt"]
     c = constants
 
+    # Eq. 17: terminator, DT3 down-weighted, daytime cloud mask.
+    cf_trm_raw = (dt1 + dt2_ngt + c.dt3_weight_trm * dt3) * (1.0 - cm_day)
+    # Eq. 18: night, max(DT1, DT2), nighttime cloud mask.
+    cf_ngt_raw = (np.maximum(dt1, dt2_ngt) + c.dt3_weight_ngt * dt3) * (1.0 - cm_ngt)
+    if c.corroborate_dt3:
+        # ZHOUYE: DT3 alone is no evidence in the branches ZHOUYE owns,
+        # applied before Eq. 19 so the one-scale claim is untouched; NaN
+        # tests stay NaN (the comparison is False there). Eq. 16 is not
+        # touched: by day the product is DEBRA.
+        alone = (dt1 == 0.0) & (dt2_ngt == 0.0)
+        cf_trm_raw = cf_trm_raw.where(~alone, 0.0)
+        cf_ngt_raw = cf_ngt_raw.where(~alone, 0.0)
     return xr.Dataset(
         {
             # Eq. 16: full daytime confidence, all three tests at full weight.
             "cf_day_raw": (dt1 + dt2 + dt3) * (1.0 - cm_day),
-            # Eq. 17: terminator, DT3 down-weighted, daytime cloud mask.
-            "cf_trm_raw": (dt1 + dt2 + c.dt3_weight_trm * dt3) * (1.0 - cm_day),
-            # Eq. 18: night, max(DT1, DT2), nighttime cloud mask.
-            "cf_ngt_raw": (np.maximum(dt1, dt2) + c.dt3_weight_ngt * dt3) * (1.0 - cm_ngt),
+            "cf_trm_raw": cf_trm_raw,
+            "cf_ngt_raw": cf_ngt_raw,
         }
     )
 

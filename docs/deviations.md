@@ -190,3 +190,6 @@ is selectable on AHI but has not been validated there.
 - **`constants.py` values.** Every calibration bound, offset and weight is
   transcribed from the paper and unit-tested against an independent
   transcription.
+- **ZHOUYE** (`pipeline.run_zhouye`, `constants.ZHOUYE`) is a separate scheme
+  built on DEBRA's chain, not a retune of it: its three hooks are off in every
+  DEBRA preset, and by day its output is the ABI-retuned DEBRA exactly.
